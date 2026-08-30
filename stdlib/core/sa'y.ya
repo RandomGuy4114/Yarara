@@ -1,0 +1,37 @@
+mbo'ehakoty Sa'y {
+    ñepyrũ(color) {
+        che.color = color
+    }
+
+    mod(string) {
+        ramo nahániri ñe'ẽmi(string) {
+            mbojevy string
+        }
+        ramo che.color == "reset" {
+            mbojevy string
+        } ambue ramo che.color == "black" {
+            mbojevy "\033[30m" + string + "\033[0m"
+        } ambue ramo che.color == "red" {
+            mbojevy "\033[31m" + string + "\033[0m"
+        } ambue ramo che.color == "green" {
+            mbojevy "\033[32m" + string + "\033[0m"
+        } ambue ramo che.color == "yellow" {
+            mbojevy "\033[33m" + string + "\033[0m"
+        } ambue ramo che.color == "blue" {
+            mbojevy "\033[34m" + string + "\033[0m"
+        } ambue ramo che.color == "magenta" {
+            mbojevy "\033[35m" + string + "\033[0m"
+        } ambue ramo che.color == "cyan" {
+            mbojevy "\033[36m" + string + "\033[0m"
+        } ambue ramo che.color == "white" {
+            mbojevy "\033[37m" + string + "\033[0m"
+        } ambue {
+            mbojevy string
+        }
+    }
+}
+
+japo col(string, color) {
+    hesa'yva = pyahu Sa'y(color)
+    mbojevy hesa'yva.mod(string)
+}

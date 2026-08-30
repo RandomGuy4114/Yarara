@@ -1,0 +1,36 @@
+japo mod(a, b) {
+    temp = b
+    aja temp + temp <= a {
+        temp = temp + temp
+    }
+    hembypy = a
+    aja temp >= b {
+        ramo hembypy >= temp {
+            hembypy = hembypy - temp
+        }
+        temp = temp / 2
+    }
+    mbojevy hembypy
+}
+
+mbo'ehakoty Ijykegua {
+    ñepyrũ(michimi) {
+        che.michimi = michimi
+    }
+
+    kyta() {
+        che.michimi = mod(che.michimi * 1103515245 + 12345, 2147483648)
+        mbojevy che.michimi
+    }
+
+    mbytepy() {
+        che.kyta()
+        mbojevy che.michimi / 2147483648
+    }
+
+    apytepe(michi, tuicha) {
+        che.kyta()
+        aty = tuicha - michi + 1
+        mbojevy michi + mod(che.michimi, aty)
+    }
+}

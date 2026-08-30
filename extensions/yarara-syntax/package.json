@@ -1,0 +1,25 @@
+{
+  "name": "yarara-syntax",
+  "displayName": "Yarara Syntax Highlighting",
+  "publisher": "yararalang",
+  "version": "0.0.4",
+  "engines": { "vscode": "^1.60.0" },
+  "categories": ["Programming Languages"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "yarara",
+        "aliases": ["Yarara", "yarara"],
+        "extensions": [".ya"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "yarara",
+        "scopeName": "source.yarara",
+        "path": "./syntaxes/yarara.tmLanguage.json"
+      }
+    ]
+  }
+}

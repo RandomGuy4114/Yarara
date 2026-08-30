@@ -1,0 +1,181 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Yarara",
+  "scopeName": "source.yarara",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#keywords" },
+    { "include": "#self" },
+    { "include": "#definitions" },
+    { "include": "#calls" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#operators" },
+    { "include": "#punctuation" }
+  ],
+  "repository": {
+    "comments": {
+      "name": "comment.line.number-sign.yarara",
+      "match": "#.*$"
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.conditional.yarara",
+          "match": "\\b(ramo|ambue)\\b"
+        },
+        {
+          "name": "keyword.control.loop.yarara",
+          "match": "\\baja\\b"
+        },
+        {
+          "name": "keyword.control.flow.yarara",
+          "match": "\\bmbojevy\\b"
+        },
+        {
+          "name": "keyword.other.import.yarara",
+          "match": "\\bpytaguañemu\\b"
+        },
+        {
+          "name": "keyword.other.print.yarara",
+          "match": "he'i"
+        },
+        {
+          "name": "storage.type.class.yarara",
+          "match": "\\bmbo'ehakoty\\b"
+        },
+        {
+          "name": "storage.type.function.yarara",
+          "match": "\\bjapo\\b"
+        },
+        {
+          "name": "keyword.other.extends.yarara",
+          "match": "\\bha'e\\b"
+        },
+        {
+          "name": "keyword.operator.new.yarara",
+          "match": "\\bpyahu\\b"
+        },
+        {
+          "name": "keyword.operator.logical.yarara",
+          "match": "\\b(ha|térã|nahániri)\\b"
+        }
+      ]
+    },
+    "self": {
+      "name": "variable.language.self.yarara",
+      "match": "\\bche\\b"
+    },
+    "definitions": {
+      "patterns": [
+        {
+          "comment": "class name after mbo'ehakoty",
+          "match": "\\b(mbo'ehakoty)\\s+([^\\W\\d]\\w*)",
+          "captures": {
+            "1": { "name": "storage.type.class.yarara" },
+            "2": { "name": "entity.name.type.class.yarara" }
+          }
+        },
+        {
+          "comment": "parent class name after ha'e",
+          "match": "\\b(ha'e)\\s+([^\\W\\d]\\w*)",
+          "captures": {
+            "1": { "name": "keyword.other.extends.yarara" },
+            "2": { "name": "entity.other.inherited-class.yarara" }
+          }
+        },
+        {
+          "comment": "function name after japo",
+          "match": "\\b(japo)\\s+([^\\W\\d]\\w*)",
+          "captures": {
+            "1": { "name": "storage.type.function.yarara" },
+            "2": { "name": "entity.name.function.yarara" }
+          }
+        },
+        {
+          "comment": "class instantiated after pyahu",
+          "match": "\\b(pyahu)\\s+([^\\W\\d]\\w*)",
+          "captures": {
+            "1": { "name": "keyword.operator.new.yarara" },
+            "2": { "name": "entity.name.type.class.yarara" }
+          }
+        }
+      ]
+    },
+    "calls": {
+      "patterns": [
+        {
+          "comment": "method or attribute after a dot",
+          "match": "(\\.)\\s*([^\\W\\d]\\w*)\\s*(?=\\()",
+          "captures": {
+            "1": { "name": "punctuation.accessor.yarara" },
+            "2": { "name": "entity.name.function.yarara" }
+          }
+        },
+        {
+          "comment": "plain attribute access after a dot",
+          "match": "(\\.)\\s*([^\\W\\d]\\w*)",
+          "captures": {
+            "1": { "name": "punctuation.accessor.yarara" },
+            "2": { "name": "variable.other.property.yarara" }
+          }
+        },
+        {
+          "comment": "function/method call",
+          "match": "\\b([^\\W\\d]\\w*)\\s*(?=\\()",
+          "name": "entity.name.function.yarara"
+        }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.double.yarara",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [{ "name": "constant.character.escape.yarara", "match": "\\\\." }]
+    },
+    "numbers": {
+      "name": "constant.numeric.yarara",
+      "match": "\\b\\d+\\b"
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.comparison.yarara",
+          "match": "==|!=|<=|>=|<|>"
+        },
+        {
+          "name": "keyword.operator.assignment.yarara",
+          "match": "="
+        },
+        {
+          "name": "keyword.operator.arithmetic.yarara",
+          "match": "\\+|-|\\*|/"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.definition.block.yarara",
+          "match": "\\{|\\}"
+        },
+        {
+          "name": "punctuation.definition.parameters.yarara",
+          "match": "\\(|\\)"
+        },
+        {
+          "name": "punctuation.separator.comma.yarara",
+          "match": ","
+        },
+        {
+          "name": "punctuation.accessor.yarara",
+          "match": "\\."
+        },
+        {
+          "name": "punctuation.definition.list.yarara",
+          "match": "\\[|\\]"
+        }
+      ]
+    }
+  }
+}
