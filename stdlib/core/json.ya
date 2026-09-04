@@ -1,0 +1,95 @@
+# -------------------------------------------------------
+# Yarara JSON Library
+# A library for working with JSON data in Yarara.
+#
+# Yarara has no dict/map type and no reflection over class
+# instance fields, so this library doesn't parse JSON into a
+# native Yarara value. Instead it writes the JSON text to a
+# temp file and shells out to Python's json module (which is
+# always available) to answer individual queries against it,
+# the same way os.ya/path.ya shell out for things Yarara can't
+# do natively.
+# By: FormalBlaze ( & Claude )
+# -------------------------------------------------------
+
+# Imports
+pytaguañemu "stdlib/core/path"
+pytaguañemu "stdlib/core/os"
+
+mbo'ehakoty jsony {
+    ñepyrũ() {
+        che.platform = os.plataforma()
+        che.tmp_path = "/tmp/yarara_json_tmp.json"
+    }
+
+    # Escapes single quotes so a key/path can be safely embedded
+    # inside the single-quoted Python string we shell out to.
+    ñemboheʼa(texto) {
+        myengovia(texto, "'", "\\'")
+        mbojevy texto
+    }
+
+    # Reads a JSON file's raw text content
+    load(archivo_rape) {
+        mbojevy path.leeArchivo(archivo_rape)
+    }
+
+    # Writes json_text to the shared temp file used by every query below
+    ñongatu(json_ñe'ẽ) {
+        path.writeFile(che.tmp_path, json_ñe'ẽ)
+    }
+
+    # Get a string-valued field
+    get(json_ñe'ẽ, ñe'ẽjoaju) {
+        che.ñongatu(json_ñe'ẽ)
+        k = che.ñemboheʼa(ñe'ẽjoaju)
+        mbojevy okerayvu(
+            "python3 -c \"import json; d=json.load(open('" +
+            che.tmp_path + "')); print(d['" + k + "'])\""
+        )
+    }
+
+    # Get a numeric field
+    getNumber(json_ñe'ẽ, ñe'ẽjoaju) {
+        mbojevy papapyrã(che.get(json_ñe'ẽ, ñe'ẽjoaju))
+    }
+
+    # Get the length of an array/object field (or the top-level
+    # value itself, if ñe'ẽjoaju is left blank ("")
+    papapy(json_ñe'ẽ, ñe'ẽjoaju) {
+        che.ñongatu(json_ñe'ẽ)
+        k = che.ñemboheʼa(ñe'ẽjoaju)
+        ramo k == "" {
+            mbojevy papapyrã(okerayvu(
+                "python3 -c \"import json; d=json.load(open('" +
+                che.tmp_path + "')); print(len(d))\""
+            ))
+        }
+        mbojevy papapyrã(okerayvu(
+            "python3 -c \"import json; d=json.load(open('" +
+            che.tmp_path + "')); print(len(d['" + k + "']))\""
+        ))
+    }
+
+    # Get an item from an array field by index
+    item(json_ñe'ẽ, ñe'ẽjoaju, index) {
+        che.ñongatu(json_ñe'ẽ)
+        k = che.ñemboheʼa(ñe'ẽjoaju)
+        mbojevy okerayvu(
+            "python3 -c \"import json; d=json.load(open('" +
+            che.tmp_path + "')); print(d['" + k + "'][" + hu'ãva(index) + "])\""
+        )
+    }
+
+    # Whether a key exists on the top-level object
+    oguereko(json_ñe'ẽ, ñe'ẽjoaju) {
+        che.ñongatu(json_ñe'ẽ)
+        k = che.ñemboheʼa(ñe'ẽjoaju)
+        mbojevy okerayvu(
+            "python3 -c \"import json; d=json.load(open('" +
+            che.tmp_path + "')); print('" + k + "' in d)\""
+        ) == "True"
+    }
+}
+
+json = pyahu jsony()

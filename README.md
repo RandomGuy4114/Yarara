@@ -33,7 +33,7 @@ y = x + 5
 # set variable y to x + 5
 ```
 
-Numbers can be made negative with a leading ```-```, e.g. ```-x``` or ```-1```.
+Numbers can be made negative with a leading ```-```, e.g. ```-x``` or ```-1```, and can have decimals, e.g. ```3.14```.
 
 ## Lists
 Lists are created with square brackets (```[``` & ```]```), holding any values separated by commas. Items are accessed and reassigned with ```[index]```, starting at ```0```.
@@ -45,13 +45,24 @@ lst[1] = 99
 he'i lst # prints [1, 99, 3]
 ```
 
-Two built-in functions work on lists: ```papapy``` returns how many items are in a list, and ```jehupi``` appends an item to the end of one.
+Several built-in functions work on lists: ```papapy``` returns how many items are in a list, ```jehupi``` appends an item to the end of one, and ```oguereko``` checks whether a value is contained in one.
 ```
 lst = [1, 2, 3]
 he'i papapy(lst) # prints 3
 
 jehupi(lst, 4)
 he'i lst # prints [1, 2, 3, 4]
+
+he'i oguereko(lst, 2) # True
+he'i oguereko(lst, 9) # False
+```
+
+Strings support the same three: ```papapy``` returns their length, ```[index]``` reads a single character, and ```oguereko``` checks for a substring.
+```
+s = "hola"
+he'i papapy(s)      # 4
+he'i s[0]            # "h"
+he'i oguereko(s, "ol") # True
 ```
 
 ## Comparison Operators
@@ -61,6 +72,36 @@ he'i 5 == 5  # True
 he'i 5 != 3  # True
 he'i 5 > 3   # True
 he'i 5 < 3   # False
+```
+
+## Math Operators
+Besides ```+```, ```-```, ```*``` & ```/```, Yarara also has ```**``` (power) and ```%``` (modulo), and parentheses can be used to group expressions.
+```
+he'i 2 ** 10   # 1024
+he'i 10 % 3    # 1
+he'i (2 + 3) * 4 # 20
+```
+
+## Ternary Expressions
+```cond ? a : b``` evaluates to ```a``` if ```cond``` is true, otherwise ```b```. It can be used anywhere a value is expected.
+```
+edad = 20
+he'i edad >= 18 ? "adulto" : "menor"
+```
+
+## Converting Between Text & Numbers
+```hu'ãva``` converts a value to text, and ```papapyrã``` converts text to a number (as an int or float, whichever fits).
+```
+he'i "edad: " + hu'ãva(25) # "edad: 25"
+he'i papapyrã("42") + 1    # 43
+```
+
+## Replacing Text
+```myengovia(variable, old, new)``` replaces every occurrence of ```old``` with ```new``` inside a string variable, reassigning it in place.
+```
+saludo = "hola mundo"
+myengovia(saludo, "mundo", "yarara")
+he'i saludo # "hola yarara"
 ```
 
 ## Checking Types
@@ -292,8 +333,21 @@ he'i "Hello World!" # Comment <- Wont be ran
 # Long comment <- Wont be ran either
 ```
 
+## Running Python
+Since Yarara is written in Python, the ```python``` keyword lets you drop into raw Python code for anything Yarara can't do on its own. It takes a string of Python source and executes it directly (it doesn't return a value back into Yarara).
+```
+python "import sys; sys.exit()"
+```
+
+## Running Shell Commands
+```okerayvu``` runs a string as a shell command and returns its trimmed output as text. It's how most of the standard library talks to the OS.
+```
+he'i okerayvu("whoami")
+he'i okerayvu("echo hola")
+```
+
 ## Imports
-To import a library (built in or custom made), the ```pytaguañemu``` keyword is used. Paths are relative to wherever you run the interpreter from.
+To import a library (built in or custom made), the ```pytaguañemu``` keyword is used. A path is resolved, in order: as an absolute path, relative to the ```.ya``` file doing the importing, relative to the Yarara project root (so ```stdlib/...``` always resolves no matter where you run from), and finally relative to your current working directory as a last resort.
 
 ```
 pytaguañemu "stdlib/core/ijykegua"
@@ -321,6 +375,87 @@ he'i col("rojo", "red")
 he'i col("verde", "green")
 ```
 Supported colors: ```black```, ```red```, ```green```, ```yellow```, ```blue```, ```magenta```, ```cyan```, ```white``` & ```reset```.
+
+### OS (```stdlib/core/os```)
+Platform, user & system info, backed by ```okerayvu```.
+```
+pytaguañemu "stdlib/core/os"
+
+he'i os.plataforma() # "Darwin", etc.
+he'i os.user()       # current username
+he'i os.version()    # OS version
+he'i os.hostname()
+he'i os.rekoShell()  # current shell
+he'i os.cwd()
+os.ñesẽha()          # exit the program
+```
+
+### Path (```stdlib/core/path```)
+File & directory operations.
+```
+pytaguañemu "stdlib/core/path"
+
+path.haiArchivo("nota.txt")            # create an empty file
+path.writeFile("nota.txt", "hola")     # write content to a file
+he'i path.leeArchivo("nota.txt")       # read a file's content
+he'i path.esArchivo("nota.txt")        # True if the file exists
+path.mkdir("carpeta")                  # create a directory
+he'i path.esDir("carpeta")             # True if the directory exists
+path.rmdir("carpeta")                  # remove a directory
+```
+
+### Time (```stdlib/core/aravo```)
+Timestamps and sleeping.
+```
+pytaguañemu "stdlib/core/aravo"
+
+he'i aravo.ohupytyTiempo() # current unix timestamp
+aravo.ke(1000)              # wait/sleep for 1000ms (1 second)
+```
+
+### JSON (```stdlib/core/json```)
+Queries JSON text/files (Yarara has no dict type, so values are read out one field at a time rather than parsed into a native Yarara object).
+```
+pytaguañemu "stdlib/core/json"
+
+data = json.load("datos.json")           # read a JSON file's raw text
+he'i json.get(data, "nombre")             # get a string field
+he'i json.getNumber(data, "version")      # get a numeric field
+he'i json.oguereko(data, "nombre")        # True if the key exists
+he'i json.papapy(data, "etiquetas")       # length of an array field
+he'i json.item(data, "etiquetas", 0)      # an array field's item by index
+```
+
+### Math (```stdlib/core/papapykuaa```)
+A full math library: constants (```pi```, ```tau```, ```e```), bounds (```abs```, ```sign```, ```min```, ```max```, ```clamp```), rounding (```floor```, ```ceil```, ```round```, ```trunc```, ```fract```), interpolation (```lerp```, ```smoothstep```), powers & roots (```pow```, ```sqrt```, ```cbrt```, ```hypot```), number theory (```factorial```, ```gcd```, ```lcm```, ```mod```), exponentials & logarithms (```exp```, ```ln```, ```log2```, ```log10```, ```log```), angle conversion (```degrees```, ```radians```), trigonometry (```sin```, ```cos```, ```tan```, ```asin```, ```acos```, ```atan```, ```atan2```) & hyperbolic functions (```sinh```, ```cosh```, ```tanh```).
+```
+pytaguañemu "stdlib/core/papapykuaa"
+
+he'i papapykuaa.pi
+he'i papapykuaa.sqrt(16)  # 4.0
+he'i papapykuaa.sin(papapykuaa.pi / 2) # 1.0
+he'i papapykuaa.gcd(48, 18) # 6
+```
+
+## Calling Native C Code
+Yarara can call functions from a compiled C shared library directly, using the built-in ```ombohasa```:
+```
+ombohasa(ruta_kuatia, tembiapo_réra, tipo_aty, jevy_tipo, mba'e_aty)
+```
+- ```ruta_kuatia```: path to the compiled ```.so```/```.dll``` (resolved the same way imports are)
+- ```tembiapo_réra```: the C function's name, as a string
+- ```tipo_aty```: a list of the argument types, as strings
+- ```jevy_tipo```: the return type, as a string
+- ```mba'e_aty```: a list of the actual argument values to pass
+
+Supported types: ```int```, ```ulong```, ```long```, ```float```, ```double```, ```str``` & ```void``` (return only).
+
+C sources live in ```native/```, compiled into ```native/build/``` (e.g. with ```clang -shared -fPIC -O2 -o native/build/libos_native.so native/os_native.c```). ```stdlib/core/aravo.ya```'s ```ke``` (sleep) function is a real example of this in use:
+```
+ke(ms) {
+    ombohasa("native/build/libos_native.so", "sys_sleep_ms", ["ulong"], "void", [ms])
+}
+```
 
 ## Examples
 There is an [examples folder](/examples/) in the repository meant to be used as templates or for learning, you're welcome!

@@ -1,3 +1,10 @@
+# -------------------------------------------------------
+# Yarara RANDOM Library
+# This Library makes it easier to generate random
+# numbers in Yarara.
+# By: FormalBlaze
+# -------------------------------------------------------
+
 japo mod(a, b) {
     temp = b
     aja temp + temp <= a {

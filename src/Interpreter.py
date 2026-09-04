@@ -1,6 +1,6 @@
 # ----------------------------
 # YARARA INTERPRETER
-
+# By FormalBlaze
 # ----------------------------
 
 # --- IMPORTS ---
@@ -8,7 +8,26 @@
 import re
 import time
 import os
+import sys
+import subprocess
+import ctypes
 from pathlib import Path
+
+# Root of the Yarara project (this file lives in <ROOT>/src/), used as a
+# stable anchor so "stdlib/..." imports and native library paths resolve
+# the same way no matter which directory the interpreter is launched from.
+ROOT_DIR = Path(__file__).resolve().parent.parent
+
+# Maps Yarara's native type names to ctypes types (None = void, valid only as a return type)
+NATIVE_CTYPES = {
+    "int": ctypes.c_int,
+    "ulong": ctypes.c_ulong,
+    "long": ctypes.c_long,
+    "float": ctypes.c_float,
+    "double": ctypes.c_double,
+    "str": ctypes.c_char_p,
+    "void": None,
+}
 
 # --- DEBUG ---
 
@@ -26,7 +45,7 @@ ramo y > 10 {
 # --- TOKEN SPECIFICATION ---
 
 TOKEN_SPEC = [
-    ("PAPAPY", r"\d+"),                   # NUMBER
+    ("PAPAPY", r"\d+(\.\d+)?"),           # NUMBER (int or decimal)
     ("JOJA", r"=="),                      # EQUAL TO
     ("NDOJOJAI", r"!="),                  # NOT EQUAL TO
     ("MICHI_JOJA", r"<="),                # LESS THAN OR EQUAL
@@ -35,7 +54,9 @@ TOKEN_SPEC = [
     ("TUICHA", r">"),                     # GREATER THAN
     ("HA_AVEI", r"\+"),                   # PLUS
     ("MENOS", r"-"),                      # MINUS
+    ("POWER", r"\*\*"),                   # POWER (must precede ONEMBOHETAVE_HAGUA)
     ("ONEMBOHETAVE_HAGUA", r"\*"),        # MULTIPLY
+    ("MOD", r"%"),                        # MODULO
     ("MBOJA_O", r"/"),                    # DIVIDE
     ("IGUAL", r"="),                      # ASSIGNMENT (=)
     ("JEIKE", r"\{"),                     # BLOCK OPEN
@@ -43,9 +64,11 @@ TOKEN_SPEC = [
     ("LPAREN", r"\("),                    # PAREN OPEN
     ("RPAREN", r"\)"),                    # PAREN CLOSE
     ("KYTA", r","),                       # COMMA
+    ("PORANDU", r"\?"),                   # TERNARY QUESTION MARK
+    ("MOKOI_BUNDLE", r":"),               # TERNARY COLON
     ("PYTA", r"\."),                      # DOT (ATTRIBUTE ACCESS)
-    ("NEEJOAJU", r'"[^"]*"'),             # STRING
-    ("RAMO", r"\bramo\b"),                # IF
+    ("NEEJOAJU", r'"(?:\\.|[^"\\])*"'),   # STRING (backslash-escapes, e.g. \" \\, are not string terminators)
+    ("HEE", r"\bramo\b"),                 # IF
     ("AMBUE", r"\bambue\b"),              # ELSE
     ("AJA", r"\baja\b"),                  # WHILE
     ("HEI", r"\bhe'i\b"),                 # PRINT
@@ -55,8 +78,10 @@ TOKEN_SPEC = [
     ("PYAHU", r"\bpyahu\b"),              # NEW (INSTANTIATE)
     ("CHE", r"\bche\b"),                  # SELF
     ("JAPO", r"\bjapo\b"),                # FUNCTION DEF
-    ("MBOJEVY", r"\bmbojevy\b"),          # RETURN
+    ("EJEVY", r"\bmbojevy\b"),            # RETURN
     ("HA", r"\bha\b"),                    # AND
+    ("MYENGOVIA", r"\bmyengovia\b"),      # REPLACE
+    ("PYTHON", r"\bpython\b"),            # PYTHON, for executing Python code. Cool, right?
     ("OR", r"\btérã\b"),                  # OR
     ("NAHANIRI", r"\bnahániri\b"),        # NOT
     ("LBRACKET", r"\["),                  # LIST OPEN
@@ -98,7 +123,7 @@ def tokenize(input_string):
 
         # Handle tokens
         if kind == "PAPAPY":
-            yield ("PAPAPY", int(value))
+            yield ("PAPAPY", float(value) if "." in value else int(value))
         elif kind == "NEEJOAJU":
             yield ("NEEJOAJU", decode_escapes(value[1:-1]))
         elif kind == "JEPOPO":
@@ -223,6 +248,22 @@ class IndexAssignNode:
         self.index_expr = index_expr
         self.expr = expr
 
+class PythonNode:
+    def __init__(self, code):
+        self.code = code
+
+class ReplaceNode:
+    def __init__(self, var_name, old_expr, new_expr):
+        self.var_name = var_name
+        self.old_expr = old_expr
+        self.new_expr = new_expr
+
+class TernaryNode:
+    def __init__(self, condition, true_expr, false_expr):
+        self.condition = condition
+        self.true_expr = true_expr
+        self.false_expr = false_expr
+
 # --- PARSER ---
 
 class Parser:
@@ -245,13 +286,13 @@ class Parser:
         return statements
 
     def statement(self):
-        if self.current_token and self.current_token[0] == "RAMO":
+        if self.current_token and self.current_token[0] == "HEE":
             return self.if_statement()
         if self.current_token and self.current_token[0] == "AJA":
             return self.while_statement()
         if self.current_token and self.current_token[0] == "HEI":
             self.next_token()  # consume HEI
-            return PrintNode(self.logic_or())
+            return PrintNode(self.ternary())
         if self.current_token and self.current_token[0] == "PYTAGUANEMU":
             self.next_token()  # consume PYTAGUANEMU
             module_token = self.expect("NEEJOAJU")
@@ -260,27 +301,51 @@ class Parser:
             return self.class_statement()
         if self.current_token and self.current_token[0] == "JAPO":
             return self.function_statement()
-        if self.current_token and self.current_token[0] == "MBOJEVY":
-            self.next_token()  # consume MBOJEVY
-            return ReturnNode(self.logic_or())
+        if self.current_token and self.current_token[0] == "EJEVY":
+            self.next_token()  # consume EJEVY
+            return ReturnNode(self.ternary())
+        if self.current_token and self.current_token[0] == "PYTHON":
+            self.next_token()  # consume PYTHON
+            code_token = self.expect("NEEJOAJU")
+            return PythonNode(code_token[1])
+        if self.current_token and self.current_token[0] == "MYENGOVIA":
+            self.next_token()  # consume MYENGOVIA
+            self.expect("LPAREN")
+            var_tok = self.expect("TERA")
+            self.expect("KYTA")
+            old_expr = self.ternary()
+            self.expect("KYTA")
+            new_expr = self.ternary()
+            self.expect("RPAREN")
+            return ReplaceNode(var_tok[1], old_expr, new_expr)
         if self.current_token and self.current_token[0] == "TERA":
             if self.pos + 1 < len(self.tokens) and self.tokens[self.pos + 1][0] == "IGUAL":
                 var_name = self.current_token[1]
                 self.next_token()
                 self.next_token()
-                expr_node = self.logic_or()
+                expr_node = self.ternary()
                 return AssignNode(var_name, expr_node)
-        node = self.logic_or()
+        node = self.ternary()
         if self.current_token and self.current_token[0] == "IGUAL":
             if isinstance(node, AttributeAccessNode):
                 self.next_token()  # consume IGUAL
-                rhs = self.logic_or()
+                rhs = self.ternary()
                 return AttributeAssignNode(node.object_expr, node.attr_name, rhs)
             if isinstance(node, IndexAccessNode):
                 self.next_token()  # consume IGUAL
-                rhs = self.logic_or()
+                rhs = self.ternary()
                 return IndexAssignNode(node.collection_expr, node.index_expr, rhs)
         return node
+
+    def ternary(self):
+        condition = self.logic_or()
+        if self.current_token and self.current_token[0] == "PORANDU":
+            self.next_token()  # consume PORANDU (?)
+            true_expr = self.ternary()
+            self.expect("MOKOI_BUNDLE")  # :
+            false_expr = self.ternary()
+            return TernaryNode(condition, true_expr, false_expr)
+        return condition
 
     def logic_or(self):
         node = self.logic_and()
@@ -320,13 +385,13 @@ class Parser:
         return statements
 
     def if_statement(self):
-        self.next_token()  # consume RAMO
-        condition = self.logic_or()
+        self.next_token()  # consume HEE
+        condition = self.ternary()
         then_block = self.block()
         else_block = None
         if self.current_token and self.current_token[0] == "AMBUE":
             self.next_token()  # consume AMBUE
-            if self.current_token and self.current_token[0] == "RAMO":
+            if self.current_token and self.current_token[0] == "HEE":
                 else_block = [self.if_statement()]
             else:
                 else_block = self.block()
@@ -334,7 +399,7 @@ class Parser:
 
     def while_statement(self):
         self.next_token()  # consume AJA
-        condition = self.logic_or()
+        condition = self.ternary()
         body = self.block()
         return WhileNode(condition, body)
 
@@ -373,10 +438,10 @@ class Parser:
         self.expect("LPAREN")
         args = []
         if self.current_token and self.current_token[0] != "RPAREN":
-            args.append(self.logic_or())
+            args.append(self.ternary())
             while self.current_token and self.current_token[0] == "KYTA":
                 self.next_token()
-                args.append(self.logic_or())
+                args.append(self.ternary())
         self.expect("RPAREN")
         return args
 
@@ -419,11 +484,19 @@ class Parser:
         return node
 
     def term(self):
-        node = self.factor()
-        while self.current_token and self.current_token[0] in ("ONEMBOHETAVE_HAGUA", "MBOJA_O"):
+        node = self.power()
+        while self.current_token and self.current_token[0] in ("ONEMBOHETAVE_HAGUA", "MBOJA_O", "MOD"):
             op = self.current_token
             self.next_token()
-            node = BinaryOpNode(node, op, self.factor())
+            node = BinaryOpNode(node, op, self.power())
+        return node
+
+    def power(self):
+        node = self.factor()
+        if self.current_token and self.current_token[0] == "POWER":
+            op = self.current_token
+            self.next_token()
+            node = BinaryOpNode(node, op, self.power())  # right-associative
         return node
 
     def factor(self):
@@ -439,7 +512,7 @@ class Parser:
                     node = AttributeAccessNode(node, attr_tok[1])
             else:
                 self.next_token()  # consume LBRACKET
-                index_expr = self.logic_or()
+                index_expr = self.ternary()
                 self.expect("RBRACKET")
                 node = IndexAccessNode(node, index_expr)
         return node
@@ -453,10 +526,10 @@ class Parser:
             self.next_token()  # consume LBRACKET
             elements = []
             if self.current_token and self.current_token[0] != "RBRACKET":
-                elements.append(self.logic_or())
+                elements.append(self.ternary())
                 while self.current_token and self.current_token[0] == "KYTA":
                     self.next_token()
-                    elements.append(self.logic_or())
+                    elements.append(self.ternary())
             self.expect("RBRACKET")
             return ListLiteralNode(elements)
         if token and token[0] == "PAPAPY":
@@ -478,6 +551,11 @@ class Parser:
                 return CallNode(name, args)
             self.next_token()
             return VarNode(token[1])
+        elif token and token[0] == "LPAREN":
+            self.next_token()  # consume LPAREN
+            node = self.ternary()
+            self.expect("RPAREN")
+            return node
         raise RuntimeError(f"Unexpected token: {token}")
 
 # --- RUNTIME VALUES ---
@@ -499,8 +577,38 @@ class YararaInstance:
 class Interpreter:
     def __init__(self):
         self.env = {}
+        self.global_env = self.env
         self.classes = {}
         self.functions = {}
+        self.imported_modules = set()
+        self.native_libs = {}
+        self.script_dirs = []
+
+    def resolve_path(self, raw_path, default_suffix=None):
+        """
+        Resolves a path referenced from Yarara source (module import, native
+        library, etc.) so it works regardless of the directory the
+        interpreter was launched from. Tries, in order:
+          1. as an absolute path
+          2. relative to the currently-executing .ya file's directory
+          3. relative to the Yarara project root (so "stdlib/..." and
+             "native/..." always work, no matter the caller's own location)
+          4. relative to the current working directory (legacy fallback)
+        """
+        p = Path(raw_path)
+        if default_suffix and not p.suffix:
+            p = p.with_suffix(default_suffix)
+        if p.is_absolute():
+            return p if p.is_file() else None
+        candidates = []
+        if self.script_dirs:
+            candidates.append(self.script_dirs[-1] / p)
+        candidates.append(ROOT_DIR / p)
+        candidates.append(Path.cwd() / p)
+        for candidate in candidates:
+            if candidate.is_file():
+                return candidate
+        return None
 
     def find_method(self, class_def, name):
         if class_def is None:
@@ -550,11 +658,27 @@ class Interpreter:
         elif isinstance(node, VarNode):
             if node.name in self.env:
                 return self.env[node.name]
+            if node.name in self.global_env:
+                return self.global_env[node.name]
             raise RuntimeError(f"\033[31m Téra ndojeikuaái: {node.name}")
         elif isinstance(node, AssignNode):
             val = self.evaluate(node.expr)
             self.env[node.var_name] = val
             return val
+        elif isinstance(node, ReplaceNode):
+            if node.var_name in self.env:
+                current = self.env[node.var_name]
+            elif node.var_name in self.global_env:
+                current = self.global_env[node.var_name]
+            else:
+                raise RuntimeError(f"\033[31m Téra ndojeikuaái: {node.var_name}")
+            if not isinstance(current, str):
+                raise RuntimeError(f"'myengovia' oikotevẽ ñe'ẽ (string): {current}")
+            old = self.evaluate(node.old_expr)
+            new = self.evaluate(node.new_expr)
+            result = current.replace(str(old), str(new))
+            self.env[node.var_name] = result
+            return result
         elif isinstance(node, BinaryOpNode) and node.op[0] == "HA":
             return self.evaluate(node.left) and self.evaluate(node.right)
         elif isinstance(node, BinaryOpNode) and node.op[0] == "OR":
@@ -570,6 +694,10 @@ class Interpreter:
                 return left_val * right_val
             elif node.op[0] == "MBOJA_O":
                 return left_val / right_val
+            elif node.op[0] == "POWER":
+                return left_val ** right_val
+            elif node.op[0] == "MOD":
+                return left_val % right_val
             elif node.op[0] == "JOJA":
                 return left_val == right_val
             elif node.op[0] == "NDOJOJAI":
@@ -582,6 +710,10 @@ class Interpreter:
                 return left_val <= right_val
             elif node.op[0] == "TUICHA_JOJA":
                 return left_val >= right_val
+        elif isinstance(node, TernaryNode):
+            if self.evaluate(node.condition):
+                return self.evaluate(node.true_expr)
+            return self.evaluate(node.false_expr)
         elif isinstance(node, IfNode):
             if self.evaluate(node.condition):
                 return self.run_block(node.then_block)
@@ -597,19 +729,28 @@ class Interpreter:
             val = self.evaluate(node.expr)
             print(val)
             return val
+        elif isinstance(node, PythonNode):
+            exec(node.code)
+            return None
         elif isinstance(node, ImportNode):
-            module_path = Path(node.module_name)
-            if not module_path.suffix:
-                module_path = module_path.with_suffix(".ya")
-            if not module_path.is_file():
+            module_path = self.resolve_path(node.module_name, default_suffix=".ya")
+            if module_path is None:
                 raise RuntimeError(f"Module not found: {node.module_name}")
+            resolved_path = module_path.resolve()
+            if resolved_path in self.imported_modules:
+                return None
+            self.imported_modules.add(resolved_path)
             with open(module_path, "r", encoding="utf-8") as f:
                 source = f.read()
             tokens = tokenize(source)
             parser = Parser(tokens)
             ast_statements = parser.parse()
-            for stmt in ast_statements:
-                self.evaluate(stmt)
+            self.script_dirs.append(resolved_path.parent)
+            try:
+                for stmt in ast_statements:
+                    self.evaluate(stmt)
+            finally:
+                self.script_dirs.pop()
             return None
         elif isinstance(node, ClassNode):
             parent_def = None
@@ -670,8 +811,8 @@ class Interpreter:
             return [self.evaluate(e) for e in node.elements]
         elif isinstance(node, IndexAccessNode):
             coll = self.evaluate(node.collection_expr)
-            if not isinstance(coll, list):
-                raise RuntimeError(f"Ndaha'éi aty (list): {coll}")
+            if not isinstance(coll, (list, str)):
+                raise RuntimeError(f"Ndaha'éi aty térã ñe'ẽ: {coll}")
             idx = int(self.evaluate(node.index_expr))
             if idx < -len(coll) or idx >= len(coll):
                 raise RuntimeError(f"Aty rehe ndaipóri: {idx}")
@@ -691,12 +832,53 @@ class Interpreter:
                 if node.args:
                     raise RuntimeError("'ára' ndoikotevẽi mba'eve")
                 return time.time_ns() % 2147483648
+            if node.name == "ombohasa":
+                if len(node.args) != 5:
+                    raise RuntimeError(
+                        "'ombohasa' oikotevẽ 5 mba'e (ñe'ẽ: kuatia .so/.dll, tembiapo réra, "
+                        "tipo aty, jevy tipo, mba'e aty)"
+                    )
+                lib_path = self.evaluate(node.args[0])
+                func_name = self.evaluate(node.args[1])
+                arg_types = self.evaluate(node.args[2])
+                return_type = self.evaluate(node.args[3])
+                call_args = self.evaluate(node.args[4])
+                if not isinstance(arg_types, list) or not isinstance(call_args, list):
+                    raise RuntimeError("'ombohasa': tipo aty ha mba'e aty ha'e vaerã aty (list)")
+                if len(arg_types) != len(call_args):
+                    raise RuntimeError("'ombohasa': tipo aty ha mba'e aty oñondivepa vaerã")
+                for t in arg_types + [return_type]:
+                    if t not in NATIVE_CTYPES:
+                        raise RuntimeError(f"'ombohasa': tipo ndojeikuaái: {t}")
+                found_path = self.resolve_path(lib_path)
+                if found_path is None:
+                    raise RuntimeError(f"'ombohasa': kuatia ndojeikuaái: {lib_path}")
+                resolved_path = str(found_path.resolve())
+                lib = self.native_libs.get(resolved_path)
+                if lib is None:
+                    lib = ctypes.CDLL(resolved_path)
+                    self.native_libs[resolved_path] = lib
+                func = getattr(lib, func_name)
+                func.argtypes = [NATIVE_CTYPES[t] for t in arg_types]
+                func.restype = NATIVE_CTYPES[return_type]
+                converted_args = []
+                for t, a in zip(arg_types, call_args):
+                    if t == "str":
+                        converted_args.append(str(a).encode("utf-8"))
+                    elif t in ("int", "ulong", "long"):
+                        converted_args.append(int(a))
+                    else:
+                        converted_args.append(a)
+                result = func(*converted_args)
+                if return_type == "str" and result is not None:
+                    return result.decode("utf-8")
+                return result
             if node.name == "papapy":
                 if len(node.args) != 1:
-                    raise RuntimeError("'papapy' oikotevẽ peteĩ mba'e (aty)")
+                    raise RuntimeError("'papapy' oikotevẽ peteĩ mba'e (aty térã ñe'ẽ)")
                 coll = self.evaluate(node.args[0])
-                if not isinstance(coll, list):
-                    raise RuntimeError(f"Ndaha'éi aty (list): {coll}")
+                if not isinstance(coll, (list, str)):
+                    raise RuntimeError(f"Ndaha'éi aty térã ñe'ẽ: {coll}")
                 return len(coll)
             if node.name == "jehupi":
                 if len(node.args) != 2:
@@ -736,6 +918,71 @@ class Interpreter:
                 if len(node.args) != 1:
                     raise RuntimeError("'atymi' oikotevẽ peteĩ mba'e")
                 return isinstance(self.evaluate(node.args[0]), list)
+            if node.name == "hu'ãva":
+                if len(node.args) != 1:
+                    raise RuntimeError("'hu'ãva' oikotevẽ peteĩ mba'e")
+                return str(self.evaluate(node.args[0]))
+            if node.name == "papapyrã":
+                if len(node.args) != 1:
+                    raise RuntimeError("'papapyrã' oikotevẽ peteĩ mba'e (ñe'ẽ)")
+                val = self.evaluate(node.args[0])
+                if isinstance(val, (int, float)):
+                    return val
+                text = str(val).strip()
+                try:
+                    return int(text)
+                except ValueError:
+                    pass
+                try:
+                    return float(text)
+                except ValueError:
+                    raise RuntimeError(f"'papapyrã': ndaha'éi papapy: {val}")
+            if node.name == "oguereko":
+                if len(node.args) != 2:
+                    raise RuntimeError("'oguereko' oikotevẽ mokõi mba'e (aty térã ñe'ẽ, mba'e)")
+                coll = self.evaluate(node.args[0])
+                item = self.evaluate(node.args[1])
+                if not isinstance(coll, (list, str)):
+                    raise RuntimeError(f"Ndaha'éi aty térã ñe'ẽ: {coll}")
+                if isinstance(coll, str) and not isinstance(item, str):
+                    item = str(item)
+                return item in coll
+            if node.name == "ambue_kuatia":
+                if len(node.args) != 1:
+                    raise RuntimeError("'ambue_kuatia' oikotevẽ peteĩ mba'e (tape)")
+                path = self.evaluate(node.args[0])
+                with open(path, "r", encoding="utf-8") as f:
+                    return f.read()
+            if node.name == "moĩ_kuatia":
+                if len(node.args) != 2:
+                    raise RuntimeError("'moĩ_kuatia' oikotevẽ mokõi mba'e (tape, kuatia)")
+                path = self.evaluate(node.args[0])
+                content = self.evaluate(node.args[1])
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(content)
+                return None
+            if node.name == "hendaite":
+                if len(node.args) != 1:
+                    raise RuntimeError("'hendaite' oikotevẽ peteĩ mba'e (tape)")
+                path = self.evaluate(node.args[0])
+                return os.path.exists(path)
+            if node.name == "tapykuere":
+                if node.args:
+                    raise RuntimeError("'tapykuere' ndoikotevẽi mba'eve")
+                return os.getcwd()
+            if node.name == "ñemboheko":
+                if len(node.args) != 1:
+                    raise RuntimeError("'ñemboheko' oikotevẽ peteĩ mba'e (téra)")
+                name = self.evaluate(node.args[0])
+                return os.environ.get(name, "")
+            if node.name == "okerayvu":
+                if len(node.args) != 1:
+                    raise RuntimeError("'okerayvu' oikotevẽ peteĩ mba'e (ñe'ẽ)")
+                command = self.evaluate(node.args[0])
+                result = subprocess.run(
+                    command, shell=True, capture_output=True, text=True
+                )
+                return result.stdout.strip()
             func_def = self.functions.get(node.name)
             if func_def is None:
                 raise RuntimeError(f"Tembiapo ndojeikuaái: {node.name}")
@@ -754,9 +1001,13 @@ class Interpreter:
 if __name__ == "__main__":
     import sys
 
+    interpreter = Interpreter()
+
     if len(sys.argv) > 1:
-        with open(sys.argv[1], "r", encoding="utf-8") as f:
+        entry_path = Path(sys.argv[1]).resolve()
+        with open(entry_path, "r", encoding="utf-8") as f:
             source = f.read()
+        interpreter.script_dirs.append(entry_path.parent)
     else:
         source = TEST_STRING
 
@@ -764,6 +1015,5 @@ if __name__ == "__main__":
     parser = Parser(tokens)
     ast_statements = parser.parse()
 
-    interpreter = Interpreter()
     for stmt in ast_statements:
         interpreter.evaluate(stmt)

@@ -1,0 +1,81 @@
+# -------------------------------------------------------
+# Yarara PATH Library
+# This Library makes it easier to work with file paths
+# and creating directories and files in Yarara.
+# By: FormalBlaze
+# -------------------------------------------------------
+
+# REQUIRED: Import the OS library for platform detection
+pytaguañemu "stdlib/core/os"
+
+platform = os.plataforma()
+
+mbo'ehakoty pathy {
+    ñepyrũ() {
+        che.platform = platform
+    }
+
+    # Write content to a file
+    writeFile(path, content) {
+        ramo che.platform == "Windows" {
+            okerayvu("echo " + content + " > " + path)
+        }
+        okerayvu("echo '" + content + "' > " + path)
+    }
+
+    # Make a new file
+    haiArchivo(path) {
+        ramo che.platform == "Windows" {
+            okerayvu("type nul > " + path)
+        }
+        okerayvu("touch " + path)
+    }
+
+    # Read content from a file
+    leeArchivo(path) {
+        ramo che.platform == "Windows" {
+            mbojevy okerayvu("type " + path)
+        }
+        mbojevy okerayvu("cat " + path)
+    }
+
+    # Make Directory Function
+    mkdir(path) {
+        ramo che.platform == "Windows" {
+            okerayvu("mkdir " + path)
+        } ambue {
+            okerayvu("mkdir -p " + path)
+        }
+    }
+
+    # Remove Directory Function
+    rmdir(path) {
+        ramo che.platform == "Windows" {
+            okerayvu("rmdir /s /q " + path)
+        } ambue {
+            okerayvu("rm -rf " + path)
+        }
+    }
+
+    # Check if a directory exists
+    esDir(path) {
+        ramo che.platform == "Windows" {
+            result = okerayvu("if exist \"" + path + "\\\" (echo true) else (echo false)")
+            mbojevy result == "true"
+        }
+        result = okerayvu("test -d " + path + " && echo 'true' || echo 'false'")
+        mbojevy result == "true"
+    }
+
+    # Check if a file exists
+    esArchivo(path) {
+        ramo che.platform == "Windows" {
+            result = okerayvu("if exist \"" + path + "\" (echo true) else (echo false)")
+            mbojevy result == "true"
+        }
+        result = okerayvu("test -f " + path + " && echo 'true' || echo 'false'")
+        mbojevy result == "true"
+    }
+}
+
+path = pyahu pathy()

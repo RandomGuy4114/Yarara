@@ -1,0 +1,64 @@
+# --------------------------
+# YARARA: FASTFETCH EXAMPLE
+# By: FormalBlaze
+# Creation Date: 2026-09-03
+# --------------------------
+
+# OS Library
+pytaguañemu "stdlib/core/os"
+
+# Color Library
+pytaguañemu "stdlib/core/sa'y"
+
+# Get the current operating system and user
+currentOS = os.plataforma()
+currentUser = os.user()
+currentVersion = os.version()
+hostName = os.hostname()
+uptime = okerayvu("uptime | sed 's/up //g'")
+shell = os.rekoShell()
+cpu = ""
+gpu = ""
+
+# Get CPU and GPU information based on the operating system (why can't we just have a universal command for this?)
+ramo currentOS == "Darwin" {
+    cpu = okerayvu("sysctl -n machdep.cpu.brand_string")
+    gpu = okerayvu("system_profiler SPDisplaysDataType | grep 'Chipset Model' | awk -F: '{print $2}' | xargs")
+}
+
+
+# Division character for formatting
+DIVISION_CHAR = "-"
+
+# Create a formatted string with the OS and user information
+FetchLine1 = currentUser + " - " + hostName
+len = papapy(FetchLine1)
+
+# Create a division line based on the length of the FetchLine1 string
+i = 0
+division = ""
+aja i < len {
+    char = FetchLine1[i]
+    division = division + DIVISION_CHAR
+    i = i + 1
+}
+
+# Create the final output strings
+FetchLine2 = col("OS / Version: ", "yellow") + currentOS + " " + currentVersion
+FetchLine3 = col("User: ", "green") + currentUser
+FetchLine4 = col("Uptime: ", "blue") + uptime
+FetchLine5 = col("Shell: ", "magenta") + shell
+FetchLine6 = col("CPU: ", "cyan") + cpu
+FetchLine7 = col("GPU: ", "red") + gpu
+
+# Print out the formatted information
+he'i ""
+he'i FetchLine1
+he'i division
+he'i FetchLine2
+he'i FetchLine3
+he'i FetchLine4
+he'i FetchLine5
+he'i FetchLine6
+he'i FetchLine7
+he'i ""

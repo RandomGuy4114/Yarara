@@ -1,3 +1,12 @@
+# -------------------------------------------------------
+# Yarara COLOR Library
+# This Library makes it easier to colorize text in the
+# terminal using ANSI escape codes.
+# By: FormalBlaze
+# -------------------------------------------------------
+
+
+
 mbo'ehakoty Sa'y {
     ñepyrũ(color) {
         che.color = color

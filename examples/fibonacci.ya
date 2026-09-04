@@ -1,6 +1,11 @@
+# --------------------------
+# YARARA: FIBONACCI EXAMPLE
+# By: FormalBlaze
+# Creation Date: 2026-08-28
+# --------------------------
+
 # Imports
 pytaguañemu "stdlib/core/ijykegua"
-pytaguañemu "stdlib/core/sa'y"
 
 # Fibonacci Function
 japo fibo_loop(n) {
@@ -18,9 +23,3 @@ japo fibo_loop(n) {
 
 # Fibonacci Test
 fibo_loop(10)
-
-
-# Color Tests
-he'i col("red", "red")
-he'i col("blue", "blue")
-he'i col("green", "green")

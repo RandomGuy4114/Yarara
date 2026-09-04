@@ -1,0 +1,59 @@
+# --------------------------
+# YARARA: CHECKLIST EXAMPLE
+# By: FormalBlaze
+# Creation Date: 2026-09-03
+# --------------------------
+
+# Import the color library
+pytaguañemu "stdlib/core/sa'y"
+
+# Import the OS library
+pytaguañemu "stdlib/core/os"
+
+# Import the PATH library
+pytaguañemu "stdlib/core/path"
+
+# Define the default content for the checklist.txt file
+FILLCONTENT = "
+[1] Walk the dog
+[2] Buy groceries
+[3] Rule the world
+"
+
+
+# Check if the checklist.txt file exists
+ramo path.esArchivo("checklist.txt") {
+
+    # If the file exists, read its content and display it
+    he'i col("checklist.txt file found!", "green")
+    he'i col("Reading checklist.txt file...", "blue")
+    fileContent = path.leeArchivo("checklist.txt")
+    he'i fileContent
+
+    # Prompt the user to mark a task as completed
+    changeInput = ñehendu("Enter the number of the task you want to mark as completed (e.g., 1, 2, 3): ")
+
+    # Check if the input is valid (i.e., a number between 1 and 3)
+    ramo oguereko(fileContent, changeInput) ha papapymi(changeInput) {
+
+        he'i "Marking task " + hu'ãva(changeInput) + " as completed..."
+        fileContent = path.leeArchivo("checklist.txt")
+        myengovia(fileContent, changeInput, "x")
+
+        # Write the updated content back to the file
+        path.writeFile("checklist.txt", fileContent)
+    }
+
+} ambue {
+    # If the file does not exist, create it and fill it with default content
+    he'i col("checklist.txt file not found! Creating it...", "red")
+
+    # Create the checklist.txt file
+    path.haiArchivo("checklist.txt")
+
+    # Fill the file with default content
+    path.writeFile("checklist.txt", FILLCONTENT)
+
+    # Tell the user that the file has been created and they should re-run the script
+    he'i col("checklist.txt file created! Re-run the script.", "green")
+}

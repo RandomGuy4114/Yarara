@@ -1,0 +1,70 @@
+# -------------------------------------------------------
+# Yarara OS Library
+# This Library makes it easier to interact
+# with the operating system and perform common tasks.
+# By: FormalBlaze
+# -------------------------------------------------------
+
+mbo'ehakoty osy {
+    ñepyrũ() {
+        che.platform = che.plataforma()
+    }
+
+    # Platform Detection Function
+    plataforma() {
+        # 'uname' exists on Darwin & Linux and returns "Darwin"/"Linux".
+        # It doesn't exist as a cmd.exe builtin, so an empty result means
+        # we're on Windows.
+        resultado = okerayvu("uname")
+        ramo resultado != "" {
+            mbojevy resultado
+        }
+        mbojevy "Windows"
+    }
+
+    # Exit Function
+    ñesẽha() {
+        python "import sys; sys.exit()"
+    }
+
+    # Get the current user
+    user() {
+        # 'whoami' works the same on Darwin, Linux & Windows
+        mbojevy okerayvu("whoami")
+    }
+
+    # Get the current operating system version
+    version() {
+        ramo che.platform == "Darwin" {
+            mbojevy okerayvu("sw_vers | grep ProductVersion | awk '{print $2}'")
+        } ambue ramo che.platform == "Linux" {
+            mbojevy okerayvu("grep VERSION_ID= /etc/os-release | head -1 | cut -d= -f2 | tr -d '\"'")
+        } ambue ramo che.platform == "Windows" {
+            mbojevy okerayvu("ver")
+        }
+    }
+
+    # Get the current working directory
+    cwd() {
+        ramo che.platform == "Windows" {
+            mbojevy okerayvu("cd")
+        }
+        mbojevy okerayvu("pwd")
+    }
+
+    # Get the hostname of the system
+    hostname() {
+        # 'hostname' works the same on Darwin, Linux & Windows
+        mbojevy okerayvu("hostname")
+    }
+
+    # Get the current shell
+    rekoShell() {
+        ramo che.platform == "Windows" {
+            mbojevy okerayvu("echo %COMSPEC%")
+        }
+        mbojevy okerayvu("echo $SHELL")
+    }
+}
+
+os = pyahu osy()

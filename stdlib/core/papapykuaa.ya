@@ -1,0 +1,311 @@
+# -------------------------------------------------------
+# Yarara MATH Library
+# This Library makes it easier to perform mathematical
+# operations in Yarara.
+# By: FormalBlaze ( & Claude )
+# -------------------------------------------------------
+
+# Constants
+PI = 3.141592653589793
+TWO_PI = 2 * PI
+PI_HALF = PI / 2
+E = 2.718281828459045
+SR_2 = 1.4142135623730951
+LN_2 = 0.6931471805599453
+LN_10 = 2.302585092994046
+
+mbo'ehakoty mathy {
+    # Constants
+    ñepyrũ() {
+        che.pi = PI
+        che.tau = TWO_PI
+        che.e = E
+        che.sr_2 = SR_2
+        che.ln_2 = LN_2
+        che.ln_10 = LN_10
+    }
+
+    # Basic Bounds
+    abs(x) {
+        ramo x < 0 {
+            mbojevy -x
+        }
+        mbojevy x
+    }
+
+    sign(x) {
+        ramo x < 0 {
+            mbojevy -1
+        }
+        ramo x > 0 {
+            mbojevy 1
+        }
+        mbojevy 0
+    }
+
+    min(a, b) {
+        ramo a < b {
+            mbojevy a
+        }
+        mbojevy b
+    }
+
+    max(a, b) {
+        ramo a > b {
+            mbojevy a
+        }
+        mbojevy b
+    }
+
+    clamp(x, min_val, max_val) {
+        mbojevy che.max(min_val, che.min(x, max_val))
+    }
+
+    mod(x, y) {
+        mbojevy x % y
+    }
+
+    # Rounding
+    floor(x) {
+        mbojevy x - che.mod(x, 1)
+    }
+
+    ceil(x) {
+        mbojevy x - che.mod(x, 1) + (x > 0 ? 1 : 0)
+    }
+
+    round(x) {
+        mbojevy che.floor(x + 0.5)
+    }
+
+    trunc(x) {
+        mbojevy che.floor(x)
+    }
+
+    fract(x) {
+        mbojevy x - che.floor(x)
+    }
+
+    # Interpolation
+    lerp(a, b, t) {
+        mbojevy a + (b - a) * t
+    }
+
+    smoothstep(edge0, edge1, x) {
+        t = che.clamp((x - edge0) / (edge1 - edge0), 0, 1)
+        mbojevy t * t * (3 - 2 * t)
+    }
+
+    # Power & Roots
+    pow(x, y) {
+        mbojevy x ** y
+    }
+
+    sqrt(x) {
+        mbojevy x ** 0.5
+    }
+
+    cbrt(x) {
+        mbojevy x ** (1/3)
+    }
+
+    hypot(a, b) {
+        mbojevy che.sqrt(a * a + b * b)
+    }
+
+    # Number Theory
+    factorial(n) {
+        result = 1
+        i = 2
+        aja i <= n {
+            result = result * i
+            i = i + 1
+        }
+        mbojevy result
+    }
+
+    gcd(a, b) {
+        a = che.abs(a)
+        b = che.abs(b)
+        aja b != 0 {
+            t = b
+            b = che.mod(a, b)
+            a = t
+        }
+        mbojevy a
+    }
+
+    lcm(a, b) {
+        mbojevy che.abs(a * b) / che.gcd(a, b)
+    }
+
+    # Exponentials & Logarithms
+    exp(x) {
+        # Range-reduce with the integer part so the Taylor series
+        # only has to converge over a small fractional remainder.
+        k = che.trunc(x)
+        r = x - k
+        term = 1
+        total = 1
+        n = 1
+        aja n < 20 {
+            term = term * r / n
+            total = total + term
+            n = n + 1
+        }
+        mbojevy total * (E ** k)
+    }
+
+    ln(x) {
+        # Range-reduce into [1, 2) first (tracking the power of two removed)
+        # so the atanh series below always converges fast, even for very
+        # large or very small x.
+        k = 0
+        aja x >= 2 {
+            x = x / 2
+            k = k + 1
+        }
+        aja x < 1 {
+            x = x * 2
+            k = k - 1
+        }
+        # ln(x) = 2 * atanh((x-1)/(x+1)), which converges for every x > 0.
+        z = (x - 1) / (x + 1)
+        z2 = z * z
+        term = z
+        total = z
+        n = 1
+        aja n < 30 {
+            term = term * z2
+            total = total + term / (2 * n + 1)
+            n = n + 1
+        }
+        mbojevy k * LN_2 + 2 * total
+    }
+
+    log2(x) {
+        mbojevy che.ln(x) / che.ln_2
+    }
+
+    log10(x) {
+        mbojevy che.ln(x) / che.ln_10
+    }
+
+    log(x, base) {
+        mbojevy che.ln(x) / che.ln(base)
+    }
+
+    # Angle Conversion
+    degrees(x) {
+        mbojevy x * (180 / PI)
+    }
+
+    radians(x) {
+        mbojevy x * (PI / 180)
+    }
+
+    # Trigonometry
+    sin(x) {
+        # Reduce x into (-PI, PI] before summing the Taylor series.
+        x = che.mod(x + PI, TWO_PI) - PI
+        term = x
+        total = x
+        x2 = x * x
+        n = 1
+        aja n < 15 {
+            term = term * (-x2) / ((2 * n) * (2 * n + 1))
+            total = total + term
+            n = n + 1
+        }
+        mbojevy total
+    }
+
+    cos(x) {
+        x = che.mod(x + PI, TWO_PI) - PI
+        term = 1
+        total = 1
+        x2 = x * x
+        n = 1
+        aja n < 15 {
+            term = term * (-x2) / ((2 * n - 1) * (2 * n))
+            total = total + term
+            n = n + 1
+        }
+        mbojevy total
+    }
+
+    tan(x) {
+        mbojevy che.sin(x) / che.cos(x)
+    }
+
+    atan(x) {
+        ramo x == 0 {
+            mbojevy 0
+        }
+        # Half-angle reduction: atan(x) = 2*atan(x / (1 + sqrt(1+x^2))).
+        # The reduced argument always has a smaller magnitude than x, so
+        # (unlike a 1/x reduction) recursing here can't oscillate — it
+        # shrinks toward 0 every step until the series below converges fast.
+        ramo che.abs(x) > 0.5 {
+            mbojevy 2 * che.atan(x / (1 + che.sqrt(1 + x * x)))
+        }
+        term = x
+        total = x
+        x2 = x * x
+        n = 1
+        aja n < 20 {
+            term = term * (-x2)
+            total = total + term / (2 * n + 1)
+            n = n + 1
+        }
+        mbojevy total
+    }
+
+    atan2(y, x) {
+        ramo x > 0 {
+            mbojevy che.atan(y / x)
+        }
+        ramo x < 0 ha y >= 0 {
+            mbojevy che.atan(y / x) + PI
+        }
+        ramo x < 0 ha y < 0 {
+            mbojevy che.atan(y / x) - PI
+        }
+        ramo y > 0 {
+            mbojevy PI_HALF
+        }
+        ramo y < 0 {
+            mbojevy -PI_HALF
+        }
+        mbojevy 0
+    }
+
+    asin(x) {
+        ramo x == 1 {
+            mbojevy PI_HALF
+        }
+        ramo x == -1 {
+            mbojevy -PI_HALF
+        }
+        mbojevy che.atan(x / che.sqrt(1 - x * x))
+    }
+
+    acos(x) {
+        mbojevy PI_HALF - che.asin(x)
+    }
+
+    # Hyperbolic Functions
+    sinh(x) {
+        mbojevy (che.exp(x) - che.exp(-x)) / 2
+    }
+
+    cosh(x) {
+        mbojevy (che.exp(x) + che.exp(-x)) / 2
+    }
+
+    tanh(x) {
+        mbojevy che.sinh(x) / che.cosh(x)
+    }
+}
+
+papapykuaa = pyahu mathy()

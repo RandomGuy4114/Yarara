@@ -1,0 +1,37 @@
+# -------------------------------------------------------
+# Yarara TIME Library
+# This Library makes it easier to perform time-related
+# operations in Yarara.
+# By: FormalBlaze
+# -------------------------------------------------------
+
+# Import OS
+pytaguañemu "stdlib/core/os"
+
+mbo'ehakoty aravoy {
+    ñepyrũ() {
+        che.start_time = che.ohupytyTiempo()
+    }
+
+    ohupytyTiempo() {
+        ramo os.plataforma() == "Windows" {
+            mbojevy okerayvu("powershell -Command \"[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()\"")
+        }
+        # 'date +%s' works the same on Darwin & Linux
+        mbojevy okerayvu("date +%s")
+    }
+
+    # Wait/sleep for the given number of milliseconds.
+    # Calls sys_sleep_ms(unsigned long) in native/os_native.c through the
+    # generic native-library FFI (ombohasa).
+    ke(ms) {
+        lib = "native/build/libos_native.so"
+        ramo os.plataforma() == "Windows" {
+            lib = "native/build/libos_native.dll"
+        }
+        ombohasa(lib, "sys_sleep_ms", ["ulong"], "void", [ms])
+    }
+
+}
+
+aravo = pyahu aravoy()
