@@ -4,6 +4,7 @@ import './index.css'
 import App from './pages/App.jsx'
 import Docs from './pages/Docs.jsx'
 import { BrowserRouter, Route, Routes } from 'react-router'
+import FAQ from './pages/FAQ.jsx'
 
 createRoot(document.getElementById('root')).render(
   <BrowserRouter>
@@ -11,6 +12,7 @@ createRoot(document.getElementById('root')).render(
       <Route path="/" element={<App />} />
       <Route path="/docs" element={<Docs />} />
       <Route path="/docs/:slug?" element={<Docs />} />
+      <Route path='/faq' element={<FAQ />} />
     </Routes>
   </BrowserRouter>,
 )

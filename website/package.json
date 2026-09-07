@@ -12,6 +12,7 @@
   "dependencies": {
     "marked": "^18.0.11",
     "motion": "^13.2.0",
+    "pyodide": "^314.0.6",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router": "^8.3.1"
