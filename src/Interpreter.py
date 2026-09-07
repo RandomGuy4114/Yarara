@@ -583,31 +583,39 @@ class Interpreter:
         self.imported_modules = set()
         self.native_libs = {}
         self.script_dirs = []
+        self.script_args = []
 
-    def resolve_path(self, raw_path, default_suffix=None):
+    def resolve_path(self, raw_path, default_suffix=None, check_packages=False):
         """
         Resolves a path referenced from Yarara source (module import, native
         library, etc.) so it works regardless of the directory the
-        interpreter was launched from. Tries, in order:
-          1. as an absolute path
-          2. relative to the currently-executing .ya file's directory
-          3. relative to the Yarara project root (so "stdlib/..." and
-             "native/..." always work, no matter the caller's own location)
-          4. relative to the current working directory (legacy fallback)
+        interpreter was launched from. Tries, in order, under each base
+        directory (the currently-executing .ya file's directory, the
+        Yarara project root, and the current working directory as a
+        legacy fallback):
+          1. as a plain path relative to that base
+          2. (imports only, when check_packages=True) as an installed ypm
+             package name — <base>/.yarara/packages/<raw_path>/main.ya
+        An absolute raw_path is used as-is, skipping all of the above.
         """
         p = Path(raw_path)
         if default_suffix and not p.suffix:
             p = p.with_suffix(default_suffix)
         if p.is_absolute():
             return p if p.is_file() else None
-        candidates = []
+        bases = []
         if self.script_dirs:
-            candidates.append(self.script_dirs[-1] / p)
-        candidates.append(ROOT_DIR / p)
-        candidates.append(Path.cwd() / p)
-        for candidate in candidates:
+            bases.append(self.script_dirs[-1])
+        bases.append(ROOT_DIR)
+        bases.append(Path.cwd())
+        for base in bases:
+            candidate = base / p
             if candidate.is_file():
                 return candidate
+            if check_packages:
+                package_candidate = base / ".yarara" / "packages" / raw_path / "main.ya"
+                if package_candidate.is_file():
+                    return package_candidate
         return None
 
     def find_method(self, class_def, name):
@@ -733,7 +741,7 @@ class Interpreter:
             exec(node.code)
             return None
         elif isinstance(node, ImportNode):
-            module_path = self.resolve_path(node.module_name, default_suffix=".ya")
+            module_path = self.resolve_path(node.module_name, default_suffix=".ya", check_packages=True)
             if module_path is None:
                 raise RuntimeError(f"Module not found: {node.module_name}")
             resolved_path = module_path.resolve()
@@ -832,6 +840,10 @@ class Interpreter:
                 if node.args:
                     raise RuntimeError("'ára' ndoikotevẽi mba'eve")
                 return time.time_ns() % 2147483648
+            if node.name == "argv":
+                if node.args:
+                    raise RuntimeError("'argv' ndoikotevẽi mba'eve")
+                return list(self.script_args)
             if node.name == "ombohasa":
                 if len(node.args) != 5:
                     raise RuntimeError(
@@ -947,6 +959,31 @@ class Interpreter:
                 if isinstance(coll, str) and not isinstance(item, str):
                     item = str(item)
                 return item in coll
+            if node.name == "ojuhu":
+                if len(node.args) != 2:
+                    raise RuntimeError("'ojuhu' oikotevẽ mokõi mba'e (aty térã ñe'ẽ, mba'e)")
+                coll = self.evaluate(node.args[0])
+                item = self.evaluate(node.args[1])
+                if not isinstance(coll, (list, str)):
+                    raise RuntimeError(f"Ndaha'éi aty térã ñe'ẽ: {coll}")
+                if isinstance(coll, str):
+                    if not isinstance(item, str):
+                        item = str(item)
+                    return coll.find(item)
+                for i, elem in enumerate(coll):
+                    if elem == item:
+                        return i
+                return -1
+            if node.name == "split":
+                if len(node.args) != 2:
+                    raise RuntimeError("'split' oikotevẽ mokõi mba'e (ñe'ẽ, ñe'ẽ)")
+                text = self.evaluate(node.args[0])
+                sep = self.evaluate(node.args[1])
+                if not isinstance(text, str) or not isinstance(sep, str):
+                    raise RuntimeError("'split' oikotevẽ ñe'ẽ (string) mokõive")
+                if sep == "":
+                    raise RuntimeError("'split': ndaikatui pehẽngue vacío (empty separator)")
+                return text.split(sep)
             if node.name == "ambue_kuatia":
                 if len(node.args) != 1:
                     raise RuntimeError("'ambue_kuatia' oikotevẽ peteĩ mba'e (tape)")
@@ -998,22 +1035,111 @@ class Interpreter:
             result = self.evaluate(stmt)
         return result
 
+YARARA_VERSION = "0.1.0"
+
+
+def build_arg_parser():
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        prog="yarara",
+        description="Yarara — a programming language built with words in the Guarani language.",
+    )
+    parser.add_argument("script", nargs="?", help="path to a .ya file to run")
+    parser.add_argument(
+        "script_args",
+        nargs=argparse.REMAINDER,
+        help="everything after the script path is passed through untouched, readable from Yarara via argv()/os.argv()",
+    )
+    parser.add_argument(
+        "-c", "--command", metavar="CODE", help="run CODE as a Yarara source string instead of a file"
+    )
+    parser.add_argument(
+        "-r", "--run", metavar="NAME",
+        help="run tools/<NAME>.ya, e.g. 'yarara -r ypm -i user/repo'. "
+             "Must be the first argument — everything after NAME is passed through as its argv()",
+    )
+    parser.add_argument(
+        "-v", "--version", action="store_true", help="print the Yarara version and exit"
+    )
+    parser.add_argument(
+        "--tokens", action="store_true", help="print the token stream instead of running the program"
+    )
+    parser.add_argument(
+        "--time", action="store_true", help="print how long the program took to run"
+    )
+    return parser
+
+
 if __name__ == "__main__":
     import sys
 
+    # -r/--run needs everything after its value passed through untouched
+    # (like 'npm run x -- args') — argparse can't cleanly express "this
+    # flag's tail is unparsed passthrough" alongside a plain positional
+    # (a value like "user/repo" right after "-i" gets misread as filling
+    # the script positional instead), so it's hand-scanned out of argv
+    # before argparse ever sees it.
+    raw_argv = sys.argv[1:]
+    run_tool = None
+    tool_args = []
+    # Only recognized as the very first argument — otherwise a script
+    # invoked directly (e.g. 'yarara tools/ypm.ya -r pkgA', where -r is
+    # ypm's OWN flag, not this one) would get hijacked: "-r pkgA" would
+    # be read as "run tools/pkgA.ya", silently discarding ypm.ya entirely.
+    if raw_argv and raw_argv[0] in ("-r", "--run"):
+        if len(raw_argv) < 2:
+            print(f"Option {raw_argv[0]} requires a tool name.", file=sys.stderr)
+            sys.exit(1)
+        run_tool = raw_argv[1]
+        tool_args = raw_argv[2:]
+        raw_argv = []
+
+    args = build_arg_parser().parse_args(raw_argv)
+
+    if args.version:
+        print(f"Yarara {YARARA_VERSION}")
+        sys.exit(0)
+
     interpreter = Interpreter()
 
-    if len(sys.argv) > 1:
-        entry_path = Path(sys.argv[1]).resolve()
+    if run_tool is not None:
+        tool_path = ROOT_DIR / "tools" / run_tool
+        if not tool_path.suffix:
+            tool_path = tool_path.with_suffix(".ya")
+        if not tool_path.is_file():
+            print(f"Tool not found: {run_tool} (looked for {tool_path})", file=sys.stderr)
+            sys.exit(1)
+        with open(tool_path, "r", encoding="utf-8") as f:
+            source = f.read()
+        interpreter.script_dirs.append(tool_path.parent)
+        interpreter.script_args = tool_args
+    elif args.command is not None:
+        interpreter.script_args = args.script_args
+        source = args.command
+    elif args.script is not None:
+        interpreter.script_args = args.script_args
+        entry_path = Path(args.script).resolve()
         with open(entry_path, "r", encoding="utf-8") as f:
             source = f.read()
         interpreter.script_dirs.append(entry_path.parent)
     else:
+        interpreter.script_args = args.script_args
         source = TEST_STRING
+
+    if args.tokens:
+        for tok in tokenize(source):
+            print(tok)
+        sys.exit(0)
 
     tokens = tokenize(source)
     parser = Parser(tokens)
     ast_statements = parser.parse()
 
+    start_time = time.time() if args.time else None
+
     for stmt in ast_statements:
         interpreter.evaluate(stmt)
+
+    if start_time is not None:
+        print(f"[{time.time() - start_time:.4f}s]", file=sys.stderr)

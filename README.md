@@ -22,6 +22,26 @@ For example, to run the Fibonacci example mentioned later in this README:
 python3 src/Interpreter.py examples/fibonacci.ya
 ```
 
+If you installed Yarara with [```tools/yararainstall.sh```](#installing-yarara), you can just run ```yarara path/to/file.ya``` instead — see [Command-Line Flags](#command-line-flags) below for the rest of the interpreter's flags.
+
+## Installing Yarara
+```tools/yararainstall.sh``` clones the repo, compiles the native library, and installs a ```yarara``` command onto your ```PATH``` (```/usr/local/bin``` if writable, otherwise ```~/.local/bin```) — needs Python 3, ```git``` & a C compiler (```gcc```).
+```
+sh tools/yararainstall.sh
+```
+It'll offer to uninstall first if ```yarara``` is already on your ```PATH```. To uninstall directly, run ```tools/yararauninstall.sh``` the same way. Both are POSIX ```sh``` scripts (no bash-only syntax), and can also install from a local checkout instead of cloning from GitHub with ```-f <path>```.
+
+## Command-Line Flags
+```
+yarara path/to/file.ya [args...]   # run a file — extra args are readable via argv()
+yarara -c "he'i 1 + 1"             # run a string of Yarara source directly
+yarara -r <tool> [args...]         # run tools/<tool>.ya, e.g. 'yarara -r ypm -s' — must be the FIRST argument
+yarara -v                          # print the Yarara version and exit
+yarara --tokens path/to/file.ya    # print the token stream instead of running the program
+yarara --time path/to/file.ya      # print how long the program took to run, on stderr
+```
+Anything after the script path (or after ```-r <tool>```) is passed through untouched and readable from Yarara via ```argv()``` — see [Reading Command-Line Arguments](#reading-command-line-arguments).
+
 ## Variables
 Variables are the same as Python variables
 ```
@@ -45,7 +65,7 @@ lst[1] = 99
 he'i lst # prints [1, 99, 3]
 ```
 
-Several built-in functions work on lists: ```papapy``` returns how many items are in a list, ```jehupi``` appends an item to the end of one, and ```oguereko``` checks whether a value is contained in one.
+Several built-in functions work on lists: ```papapy``` returns how many items are in a list, ```jehupi``` appends an item to the end of one, ```oguereko``` checks whether a value is contained in one, and ```ojuhu``` finds the index of a value (or ```-1``` if it isn't there).
 ```
 lst = [1, 2, 3]
 he'i papapy(lst) # prints 3
@@ -55,14 +75,23 @@ he'i lst # prints [1, 2, 3, 4]
 
 he'i oguereko(lst, 2) # True
 he'i oguereko(lst, 9) # False
+
+he'i ojuhu(lst, 2) # 1 (index of the first "2")
+he'i ojuhu(lst, 9) # -1 (not found)
 ```
 
-Strings support the same three: ```papapy``` returns their length, ```[index]``` reads a single character, and ```oguereko``` checks for a substring.
+Strings support the same four: ```papapy``` returns their length, ```[index]``` reads a single character, ```oguereko``` checks for a substring, and ```ojuhu``` finds a substring's index.
 ```
 s = "hola"
 he'i papapy(s)      # 4
 he'i s[0]            # "h"
 he'i oguereko(s, "ol") # True
+he'i ojuhu(s, "la")    # 2
+```
+
+```split(text, sep)``` breaks a string into a list wherever ```sep``` appears (Yarara has no string slicing, so this is the main way to break text apart).
+```
+he'i split("one,two,three", ",") # ["one", "two", "three"]
 ```
 
 ## Comparison Operators
@@ -347,11 +376,27 @@ he'i okerayvu("echo hola")
 ```
 
 ## Imports
-To import a library (built in or custom made), the ```pytaguañemu``` keyword is used. A path is resolved, in order: as an absolute path, relative to the ```.ya``` file doing the importing, relative to the Yarara project root (so ```stdlib/...``` always resolves no matter where you run from), and finally relative to your current working directory as a last resort.
+To import a library (built in or custom made), the ```pytaguañemu``` keyword is used. A path is resolved under each of these bases in turn — as a plain path relative to the ```.ya``` file doing the importing, relative to the Yarara project root (so ```stdlib/...``` always resolves no matter where you run from), then relative to your current working directory as a last resort — or used as-is if it's absolute.
 
 ```
 pytaguañemu "stdlib/core/ijykegua"
 ```
+
+A bare name (no ```/```) also checks for an installed [ypm](#package-manager-ypm) package under each of those same bases, i.e. ```<base>/.yarara/packages/<name>/main.ya```:
+```
+pytaguañemu "some-installed-package"
+```
+
+## Reading Command-Line Arguments
+```argv()``` returns a list of every command-line argument passed after the script's own path — e.g. running ```yarara main.ya --foo bar``` makes ```argv()``` return ```["--foo", "bar"]``` inside ```main.ya```. It's how [```tools/ypm.ya```](#package-manager-ypm) and [```tools/yaraproj.ya```](#project-scaffolding-yaraproj) parse their own flags.
+```
+he'i argv()
+
+ramo oguereko(argv(), "-d") {
+    he'i "debug mode on"
+}
+```
+```os.argv()``` in [```stdlib/core/os```](#os-stdlibcoreos) is a thin wrapper around the same thing.
 
 ## Standard Library
 Yarara ships a small standard library under ```stdlib/```.
@@ -377,18 +422,21 @@ he'i col("verde", "green")
 Supported colors: ```black```, ```red```, ```green```, ```yellow```, ```blue```, ```magenta```, ```cyan```, ```white``` & ```reset```.
 
 ### OS (```stdlib/core/os```)
-Platform, user & system info, backed by ```okerayvu```.
+Platform, user & system info, backed by ```okerayvu```. Windows support (```plataforma```, ```version```, ```cwd```, ```rekoShell```) is written from documented command behavior but not verified on an actual Windows machine.
 ```
 pytaguañemu "stdlib/core/os"
 
-he'i os.plataforma() # "Darwin", etc.
+he'i os.plataforma() # "Darwin", "Linux", or "Windows"
 he'i os.user()       # current username
 he'i os.version()    # OS version
 he'i os.hostname()
 he'i os.rekoShell()  # current shell
 he'i os.cwd()
+he'i os.argv()       # same as the argv() builtin
+os.setAlias("mimando", "python3 script.py") # add a permanent shell alias
 os.ñesẽha()          # exit the program
 ```
+```os.setAlias``` appends to your shell's startup file (```~/.zshrc```, ```~/.bashrc```, or ```~/.profile```, whichever matches ```rekoShell```) — it only takes effect in *new* shells, since a subprocess can't modify the shell that launched it.
 
 ### Path (```stdlib/core/path```)
 File & directory operations.
@@ -402,6 +450,34 @@ he'i path.esArchivo("nota.txt")        # True if the file exists
 path.mkdir("carpeta")                  # create a directory
 he'i path.esDir("carpeta")             # True if the directory exists
 path.rmdir("carpeta")                  # remove a directory
+path.moveFile("a.txt", "b.txt")        # move/rename a file
+he'i path.getPath("a.txt")             # absolute path of a file or directory
+he'i path.listDir("carpeta")           # list of entries directly inside a directory
+```
+
+### Network (```stdlib/core/network```)
+Git & HTTP operations, backed by ```git```/```curl```.
+```
+pytaguañemu "stdlib/core/network"
+
+network.clone("https://github.com/user/repo.git", "destino")     # git clone
+network.getFile("https://example.com/archivo.txt")               # curl -O (saves using the URL's filename)
+network.cloneFolder("https://github.com/user/repo.git", "some/subfolder", "destino") # sparse-checkout just one subfolder
+```
+```cloneFolder``` needs git ≥ 2.25 (for ```sparse-checkout --cone```).
+
+### CLI (```stdlib/core/cli```)
+Helpers for building terminal programs — progress bars and live-updating output.
+```
+pytaguañemu "stdlib/core/cli"
+
+he'i cli.progressBar(30, 100, 20, "=", "-") # a 20-char bar at 30/100 filled with = / -
+
+aja i < 5 {
+    he'i cli.progressBar(i, 5, 20, "#", "-")
+    cli.clearLastLine() # erase that line so the next one overwrites it in place
+    i = i + 1
+}
 ```
 
 ### Time (```stdlib/core/aravo```)
@@ -414,7 +490,7 @@ aravo.ke(1000)              # wait/sleep for 1000ms (1 second)
 ```
 
 ### JSON (```stdlib/core/json```)
-Queries JSON text/files (Yarara has no dict type, so values are read out one field at a time rather than parsed into a native Yarara object).
+Queries and updates JSON text/files (Yarara has no dict type, so values are read/written one field at a time rather than parsed into a native Yarara object — it works by shelling out to Python's ```json``` module).
 ```
 pytaguañemu "stdlib/core/json"
 
@@ -424,6 +500,10 @@ he'i json.getNumber(data, "version")      # get a numeric field
 he'i json.oguereko(data, "nombre")        # True if the key exists
 he'i json.papapy(data, "etiquetas")       # length of an array field
 he'i json.item(data, "etiquetas", 0)      # an array field's item by index
+he'i json.getArray(data, "etiquetas")     # the whole array field as a Yarara list
+
+data = json.set(data, "version", 2)       # set a field (string/number/bool), returns updated JSON text
+json.save("datos.json", data)             # write JSON text to a file
 ```
 
 ### Math (```stdlib/core/papapykuaa```)
@@ -456,6 +536,30 @@ ke(ms) {
     ombohasa("native/build/libos_native.so", "sys_sleep_ms", ["ulong"], "void", [ms])
 }
 ```
+
+## Command-Line Tools
+Two Yarara-written tools live under ```tools/``` and are meant to be run with ```yarara -r <name>``` (see [Command-Line Flags](#command-line-flags)) once Yarara is installed.
+
+### Project Scaffolding (```yaraproj```)
+```
+yarara -r yaraproj -i   # initialize a new Yarara project in the current directory
+yarara -r yaraproj -d -i # same, with debug output
+yarara -r yaraproj -h   # show help
+```
+Creates a ```.yarara/config.json``` (name, version, description, author, ```dependencies```) — that's the only thing it creates; it doesn't vendor a copy of the interpreter or stdlib into your project (that's what a global [install](#installing-yarara) is for).
+
+### Package Manager (```ypm```)
+Installs packages from a GitHub repo (```user/repo``` shorthand) or a local directory into ```.yarara/packages/<name>/```. Every package **must** have a ```main.ya``` entry point — installs without one are rejected and cleaned up automatically. Each install also gets its own ```package.json``` (name/type/source), and successful installs are recorded in the project's ```.yarara/config.json``` under ```dependencies```.
+```
+yarara -r ypm -i user/repo        # install a package from GitHub
+yarara -r ypm -i -l ../my-package # install a package from a local directory
+yarara -r ypm -s                  # list installed packages
+yarara -r ypm -r <name>           # remove an installed package
+yarara -r ypm -y                  # sync: install everything listed in config.json's dependencies
+                                   # (this is what makes a project reproducible after a fresh clone,
+                                   #  since .yarara/packages/ is a local build artifact, not something you'd commit)
+```
+Import an installed package with its short name, e.g. ```pytaguañemu "user_repo_name"``` — see [Imports](#imports).
 
 ## Examples
 There is an [examples folder](/examples/) in the repository meant to be used as templates or for learning, you're welcome!

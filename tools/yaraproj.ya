@@ -1,0 +1,87 @@
+pytaguañemu "stdlib/core/sa'y"
+pytaguañemu "stdlib/core/path"
+pytaguañemu "stdlib/core/json"
+pytaguañemu "stdlib/core/os"
+pytaguañemu "stdlib/core/cli"
+
+debug = ""
+
+# --- Helpers ---
+
+# Prints "DEBUG: label: value" in yellow, only when -d was passed
+japo debugLog(label, value) {
+    ramo debug == "-d" {
+        # hu'ãva() since value isn't always a string — ñehendu() auto-converts
+        # numeric-looking input (e.g. a version like "1.0") to a number
+        he'i col("DEBUG: " + label + ": ", "yellow") + hu'ãva(value)
+    }
+}
+
+# Redraws the progress bar at the given percent, only when debug output is
+# off (the bar and DEBUG lines would otherwise fight over the same lines)
+japo showProgress(percent) {
+    ramo debug == "" {
+        cli.clearLastLine()
+        he'i cli.progressBar(percent, 100, 30, "=", "-") + " " + hu'ãva(percent) + "%"
+    }
+}
+
+# --- Flags ---
+
+ramo oguereko(argv(), "-d") {
+    debug = "-d"
+}
+
+ramo oguereko(argv(), "-h") {
+    he'i col("Yaraproj - Yarara Project Manager", "green")
+    he'i col("Usage: [COMMAND] [OPTIONS]", "black")
+    he'i col("Commands:", "blue")
+    he'i "  init (-i)    Initialize a new Yarara project"
+    he'i "  help (-h)    Show this help message"
+    he'i "  debug (-d)   Enable debug output"
+}
+
+# --- Init ---
+
+ramo oguereko(argv(), "-i") {
+    he'i "Initializing a new Yarara project in the current directory..."
+    debugLog("Current Directory", os.cwd())
+
+    name = ñehendu(col("Enter project name: ", "black"))
+    version = ñehendu(col("Enter project version: ", "black"))
+    desc = ñehendu(col("Enter project description: ", "black"))
+    author = ñehendu(col("Enter project author: ", "black"))
+
+    debugLog("Project Name", name)
+    debugLog("Project Version", version)
+    debugLog("Project Description", desc)
+    debugLog("Project Author", author)
+
+    ramo path.esDir(".yarara") {
+        he'i col("Error: A Yarara project already exists in this directory.", "red")
+    } ambue {
+        showProgress(0)
+        path.mkdir(".yarara")
+
+        showProgress(20)
+        path.writeFile(".yarara/config.json", "{}")
+        data = json.load(".yarara/config.json")
+
+        showProgress(30)
+        data = json.set(data, "name", name)
+        data = json.set(data, "version", version)
+        data = json.set(data, "description", desc)
+        data = json.set(data, "author", author)
+        data = json.set(data, "dependencies", [])
+        debugLog("Updated JSON Data", data)
+
+        showProgress(60)
+        json.save(".yarara/config.json", data)
+        debugLog("Saved JSON Data to", ".yarara/config.json")
+
+        showProgress(100)
+        he'i col("Yarara project initialized successfully!", "green")
+        debugLog("Final JSON Data", data)
+        debugLog("Current Directory", os.cwd())
+    }
+}

@@ -23,6 +23,27 @@ For example, to run the Fibonacci example mentioned later in this guide:
 python3 src/Interpreter.py examples/fibonacci.ya
 ```
 
+### Installing Yarara
+There's also a proper installer now: ```tools/yararainstall.sh``` clones the repository, compiles the native library, and installs a ```yarara``` command onto your ```PATH``` (```/usr/local/bin``` if it's writable, otherwise ```~/.local/bin```). It needs Python 3, ```git``` and a C compiler (```gcc```) already available.
+```
+sh tools/yararainstall.sh
+```
+If ```yarara``` is already installed, it'll offer to uninstall first before reinstalling. To remove it directly, run ```tools/yararauninstall.sh``` the same way. Both are written as POSIX ```sh``` scripts, not bash — no ```[[ ]]```, no ```&>```, so they run correctly under a strict ```/bin/sh``` (e.g. ```dash``` on many Linux distributions), not just under bash. There's also a ```-f <path>``` flag on the installer to install from an existing local checkout instead of cloning fresh from GitHub.
+
+Once installed, everything in this guide that shows ```python3 src/Interpreter.py path/to/file.ya``` can be written as ```yarara path/to/file.ya``` instead.
+
+### Command-Line Flags
+The interpreter itself accepts a handful of flags, all optional:
+```
+yarara path/to/file.ya [args...]   # run a file — extra args are readable via argv()
+yarara -c "he'i 1 + 1"             # run a string of Yarara source directly, instead of a file
+yarara -r <tool> [args...]         # run tools/<tool>.ya — must be the FIRST argument
+yarara -v                          # print the Yarara version and exit
+yarara --tokens path/to/file.ya    # print the raw token stream instead of running the program
+yarara --time path/to/file.ya      # print how long the program took to run, on stderr
+```
+```-r``` is specifically for the Yarara-written command-line tools under ```tools/``` (covered in their own section further down) — ```yarara -r ypm -s```, for example, runs ```tools/ypm.ya``` with ```-s``` as its own argument. It's deliberately only recognized as the very first argument on the command line: a tool invoked directly (```yarara tools/ypm.ya -r pkgName```, say) is free to define its own ```-r``` flag for its own purposes without it being intercepted by the interpreter's own ```-r```. Anything after the script path (or after ```-r <tool>```) is passed through untouched and readable from inside the script via ```argv()``` — see the Reading Command-Line Arguments section below.
+
 ### File Creation
 Making a Yarara Program is very simple, all you need to do is create a file (with any name) that finishes with the ```.ya``` file extension.
 
@@ -84,7 +105,7 @@ Lists in Yarara can hold a mix of any value type at once — numbers, strings, o
 
 Negative indices work too, counting back from the end of the list, exactly like Python (```lst[-1]``` is the last element). Indexing out of bounds in either direction raises a runtime error rather than silently returning something unexpected, so it's worth double-checking a computed index is in range before using it.
 
-Several built-in functions work on lists: ```papapy``` returns how many items are in a list, ```jehupi``` appends an item to the end of one, and ```oguereko``` checks whether a value is contained in one.
+Several built-in functions work on lists: ```papapy``` returns how many items are in a list, ```jehupi``` appends an item to the end of one, ```oguereko``` checks whether a value is contained in one, and ```ojuhu``` finds the index of the first occurrence of a value (```-1``` if it isn't present).
 ```
 lst = [1, 2, 3]
 he'i papapy(lst) # prints 3
@@ -94,15 +115,25 @@ he'i lst # prints [1, 2, 3, 4]
 
 he'i oguereko(lst, 2) # True
 he'i oguereko(lst, 9) # False
+
+he'i ojuhu(lst, 2) # 1
+he'i ojuhu(lst, 9) # -1
 ```
 
-Strings support the same three built-ins: ```papapy``` returns their length, ```[index]``` reads a single character, and ```oguereko``` checks for a substring. Strings are written with double quotes (```"..."```), and support the usual backslash escapes: ```\n``` (newline), ```\t``` (tab), ```\\``` (backslash), ```\"``` (a literal double quote inside the string) and octal escapes like ```\101```.
+Strings support the same four built-ins: ```papapy``` returns their length, ```[index]``` reads a single character, ```oguereko``` checks for a substring, and ```ojuhu``` finds a substring's starting index. Strings are written with double quotes (```"..."```), and support the usual backslash escapes: ```\n``` (newline), ```\t``` (tab), ```\\``` (backslash), ```\"``` (a literal double quote inside the string) and octal escapes like ```\101```.
 ```
 s = "hola"
 he'i papapy(s)      # 4
 he'i s[0]            # "h"
 he'i oguereko(s, "ol") # True
+he'i ojuhu(s, "la")    # 2
 ```
+
+There's also ```split(text, sep)```, which breaks a string apart into a list wherever ```sep``` occurs — it's the closest thing Yarara has to string slicing, since there's no ```text[start:end]``` syntax at all.
+```
+he'i split("one,two,three", ",") # ["one", "two", "three"]
+```
+```split``` breaks on *every* occurrence of ```sep```, which matters if a value you're splitting might itself contain the separator more than once in a way you don't want torn apart — several standard-library tools (```ypm```, covered later) write their own small "split on the first occurrence only" helper for exactly that reason, rather than relying on ```split``` directly.
 
 Note that, unlike lists, strings in Yarara are not currently mutable through ```[index] = ...``` assignment — that form of assignment is reserved for lists. To transform a string, build a new one (with concatenation, or with ```myengovia```, covered a bit further down) and assign it back to the variable.
 
@@ -454,7 +485,7 @@ he'i okerayvu("echo hola")
 The command runs through the system shell (equivalent to Python's ```subprocess.run(..., shell=True)```), so ordinary shell syntax — pipes, redirects, environment variable expansion, and so on — all work exactly as they would if you typed the command directly into a terminal. Only standard output is returned (leading/trailing whitespace stripped); if the command fails or writes to standard error, ```okerayvu``` doesn't raise a Yarara-level error on its own, so code that depends on a command having succeeded should check its output (as, for example, ```os.plataforma()``` does, treating an empty result from ```uname``` as a signal that the platform must be Windows, where ```uname``` doesn't exist). Because the string is passed straight to the shell, avoid building commands by concatenating in raw, untrusted user input without thinking about shell-escaping — the same care you'd take with ```subprocess.run(shell=True)``` in Python applies here too.
 
 ## Imports
-To import a library (built in or custom made), the ```pytaguañemu``` ("to make a hole through" — used here for "import") keyword is used. A path is resolved, in order: as an absolute path, relative to the ```.ya``` file doing the importing, relative to the Yarara project root (so ```stdlib/...``` always resolves no matter where you run from), and finally relative to your current working directory as a last resort.
+To import a library (built in or custom made), the ```pytaguañemu``` ("to make a hole through" — used here for "import") keyword is used. A path is resolved under each of these bases in turn: relative to the ```.ya``` file doing the importing, relative to the Yarara project root (so ```stdlib/...``` always resolves no matter where you run from), then relative to your current working directory as a last resort — or used as-is if it's an absolute path.
 
 ```
 pytaguañemu "stdlib/core/ijykegua"
@@ -463,6 +494,32 @@ pytaguañemu "stdlib/core/ijykegua"
 You can leave off the ```.ya``` extension (as every example above does) — Yarara appends it automatically when resolving the path. Each module is only ever imported (tokenized, parsed and run) once per program, no matter how many times ```pytaguañemu``` is called on it from different files: Yarara tracks already-imported modules by their fully resolved path and silently skips a repeat import, which is what lets ```stdlib/core/path``` and ```stdlib/core/aravo``` both import ```stdlib/core/os``` internally without redefining the ```os``` class twice if your own program also imports ```stdlib/core/os``` directly.
 
 Custom modules work exactly the same way as standard library ones — there's no special "library" designation, ```pytaguañemu``` just runs the target file's statements top to bottom in the current program's environment, so any classes, functions or top-level variables it defines become available afterward, precisely how the standard library modules define a class and then instantiate it into a conventionally-named variable (like ```os = pyahu osy()``` at the bottom of ```stdlib/core/os.ya```) for you to use right away without an explicit ```pyahu``` of your own.
+
+A bare name with no ```/``` in it is also checked against every installed [ypm](#package-manager-ypm) package, at ```<base>/.yarara/packages/<name>/main.ya```, under each of the same bases described above:
+```
+pytaguañemu "some-installed-package"
+```
+This only ever matches an actual file on disk — there's no separate "is this a package name" detection, ```pytaguañemu``` just tries the plain-path candidates first and the package candidate second at each base, so a package name can never silently shadow a real local file that happens to share its name.
+
+## Reading Command-Line Arguments
+```argv()``` returns a list of every command-line argument that appeared after the script's own path — running ```yarara main.ya --foo bar``` makes ```argv()``` return ```["--foo", "bar"]``` inside ```main.ya```. This is what lets a Yarara program act like a real CLI tool with its own flags, and it's how both ```tools/ypm.ya``` and ```tools/yaraproj.ya``` (covered later) parse their own arguments.
+```
+he'i argv()
+
+ramo oguereko(argv(), "-d") {
+    he'i "debug mode on"
+}
+```
+Combine ```argv()``` with ```ojuhu``` to read the *value* that follows a flag, not just detect its presence:
+```
+args = argv()
+i = ojuhu(args, "-f")
+ramo i != -1 ha i + 1 < papapy(args) {
+    ruta = args[i + 1]
+    he'i ruta
+}
+```
+The bounds check (```i + 1 < papapy(args)```) matters — if ```-f``` is the very last argument with nothing after it, indexing past the end of the list raises a runtime error rather than quietly returning something. ```os.argv()``` (covered in the Standard Library section) is just a thin wrapper around this same builtin.
 
 ## Standard Library
 Yarara ships a small standard library under ```stdlib/```.
@@ -494,16 +551,20 @@ Platform, user & system info, backed by ```okerayvu```.
 ```
 pytaguañemu "stdlib/core/os"
 
-he'i os.plataforma() # "Darwin", etc.
+he'i os.plataforma() # "Darwin", "Linux", or "Windows"
 he'i os.user()       # current username
 he'i os.version()    # OS version
 he'i os.hostname()
 he'i os.rekoShell()  # current shell
 he'i os.cwd()
+he'i os.argv()       # same list as the argv() builtin
+os.setAlias("mimando", "python3 script.py") # add a permanent shell alias
 os.ñesẽha()          # exit the program
 ```
 
-```os.plataforma()``` returns ```"Darwin"``` on macOS, ```"Linux"``` on Linux, or ```"Windows"``` (detected indirectly, since there's no equivalent shell builtin to ask directly) on Windows, and is the value most of the rest of the standard library branches on internally to pick the right shell command for the current OS. ```os.ñesẽha()``` terminates the whole program immediately via Python's ```sys.exit()``` under the hood (through the ```python``` interop keyword covered earlier) — nothing after the call runs.
+```os.plataforma()``` returns ```"Darwin"``` on macOS, ```"Linux"``` on Linux, or ```"Windows"``` (detected indirectly, since there's no equivalent shell builtin to ask directly) on Windows, and is the value most of the rest of the standard library branches on internally to pick the right shell command for the current OS — that said, the Windows branches throughout the standard library are written from documented command behavior rather than verified on an actual Windows machine, so treat them as a best-effort starting point rather than a guarantee. ```os.ñesẽha()``` terminates the whole program immediately via Python's ```sys.exit()``` under the hood (through the ```python``` interop keyword covered earlier) — nothing after the call runs.
+
+```os.setAlias(alias, command)``` appends ```alias <alias>='<command>'``` to your shell's startup file — ```~/.zshrc```, ```~/.bashrc```, or ```~/.profile```, whichever matches ```rekoShell()``` (on Windows, it instead appends a ```doskey``` macro and points ```cmd.exe```'s ```AutoRun``` registry key at it). It's worth being explicit about what this can and can't do: a child process (which is exactly what ```okerayvu``` spawns to run the ```alias```/```doskey``` command) can never modify the environment of the shell that launched it, so this only ever takes effect in *new* shells opened after the call — it can't reach back and make the alias available in whatever terminal is currently running your Yarara program. If a value you're passing into the alias command (a file path, say) contains spaces, remember to quote it inside the command string yourself (```"python3 \"" + ruta + "\""```) — the shell re-parses an alias's stored text as a brand-new command line every time it's invoked, so an unquoted space-containing path gets torn apart into separate arguments just like any other unquoted shell word.
 
 ### Path (```stdlib/core/path```)
 File & directory operations.
@@ -517,9 +578,39 @@ he'i path.esArchivo("nota.txt")        # True if the file exists
 path.mkdir("carpeta")                  # create a directory
 he'i path.esDir("carpeta")             # True if the directory exists
 path.rmdir("carpeta")                  # remove a directory
+path.moveFile("a.txt", "b.txt")        # move/rename a file
+he'i path.getPath("a.txt")             # absolute path — works for files AND directories
+he'i path.listDir("carpeta")           # entries directly inside a directory, as a list
 ```
 
-Every one of these methods works by shelling out to a platform-appropriate command through ```okerayvu``` (```touch```/```type nul```, ```cat```/```type```, ```test -f```/```if exist```, and so on) rather than using Python's own file APIs directly, keeping the whole library consistent with how the rest of ```stdlib/``` talks to the OS. A practical consequence worth knowing: ```writeFile``` overwrites a file's entire contents each time it's called (it does not append), so updating a file — as the checklist example does — means reading the current content first with ```leeArchivo```, modifying that text with something like ```myengovia```, and writing the whole updated string back with ```writeFile```. ```rmdir``` removes a directory and everything inside it recursively (```rm -rf``` on Unix-like platforms), so use it carefully — it does not ask for confirmation.
+Every one of these methods works by shelling out to a platform-appropriate command through ```okerayvu``` (```touch```/```type nul```, ```cat```/```type```, ```test -f```/```if exist```, and so on) rather than using Python's own file APIs directly, keeping the whole library consistent with how the rest of ```stdlib/``` talks to the OS. A practical consequence worth knowing: ```writeFile``` overwrites a file's entire contents each time it's called (it does not append), so updating a file — as the checklist example does — means reading the current content first with ```leeArchivo```, modifying that text with something like ```myengovia```, and writing the whole updated string back with ```writeFile```. ```rmdir``` removes a directory and everything inside it recursively (```rm -rf``` on Unix-like platforms), so use it carefully — it does not ask for confirmation. ```getPath``` deliberately doesn't just ```cd``` into its argument and ```pwd``` (an earlier version of it did, and that silently failed on anything that wasn't a directory) — it shells out to Python's ```os.path.abspath``` instead, so it works for a plain file path just as well as a directory. ```listDir``` returns entries in whatever order the underlying ```ls -1```/```dir /b``` produces them, one level deep only — it isn't recursive.
+
+### Network (```stdlib/core/network```)
+Git & HTTP operations, backed by ```git```/```curl```.
+```
+pytaguañemu "stdlib/core/network"
+
+network.clone("https://github.com/user/repo.git", "destino")     # git clone
+network.getFile("https://example.com/archivo.txt")               # curl -O, saves under the URL's own filename
+network.cloneFolder("https://github.com/user/repo.git", "some/subfolder", "destino") # just one subfolder
+```
+```cloneFolder``` doesn't do a full clone and then throw away everything outside the requested subfolder — it uses ```git clone --no-checkout --depth 1``` together with ```git sparse-checkout --cone``` so only the files inside that one subfolder are actually fetched and checked out, which needs git 2.25 or newer. Both ```clone``` and ```cloneFolder``` shell straight out to ```git```, so any authentication your system's ```git``` is already configured for (SSH keys, stored HTTPS credentials, etc.) applies here too, exactly as if you'd typed the command yourself.
+
+### CLI (```stdlib/core/cli```)
+Small helpers for building interactive terminal programs — progress bars and live-updating output.
+```
+pytaguañemu "stdlib/core/cli"
+
+he'i cli.progressBar(30, 100, 20, "=", "-") # a 20-character bar, 30% filled with "=", rest "-"
+
+i = 0
+aja i < 5 {
+    he'i cli.progressBar(i, 5, 20, "#", "-")
+    cli.clearLastLine()
+    i = i + 1
+}
+```
+```progressBar``` is pure string-building — it doesn't print anything itself, it just returns the bar text for you to ```he'i```. ```clearLastLine``` is the piece that makes a progress bar actually feel "live": it writes raw ANSI escape codes (cursor-up + clear-line) straight to the process's real standard output using the ```python``` interop keyword, rather than shelling a command like ```echo``` out through ```okerayvu``` — ```okerayvu``` captures a subprocess's output into a string instead of letting it reach the real terminal, so an earlier version of this method that tried to shell the escape codes out via ```echo``` silently did nothing at all. On Windows, it instead writes a plain carriage return (```\r```), which repositions the cursor but doesn't erase existing characters the way the ANSI clear-line sequence does — fine when each redraw is at least as long as the last one (as in a typical progress bar), but it won't fully erase a *shorter* line.
 
 ### Time (```stdlib/core/aravo```)
 Timestamps and sleeping.
@@ -533,7 +624,7 @@ aravo.ke(1000)              # wait/sleep for 1000ms (1 second)
 ```aravo.ohupytyTiempo()``` ("to reach time") returns the current Unix timestamp (seconds since 1970) as text pulled from the shell's ```date```/PowerShell command — instantiating ```aravoy``` also stores this same value on ```che.start_time``` in the constructor, so an instance remembers when it was created if you want to measure elapsed time later. ```aravo.ke()``` ("to sleep") is the more interesting of the two: unlike everything else in the standard library, it doesn't shell out — it calls straight into a small compiled C function (```sys_sleep_ms```) through Yarara's native FFI (```ombohasa```, covered in its own section below), making it a good worked example to read if you're curious how native interop looks end-to-end in a real library rather than a toy snippet.
 
 ### JSON (```stdlib/core/json```)
-Queries JSON text/files (Yarara has no dict type, so values are read out one field at a time rather than parsed into a native Yarara object).
+Queries and updates JSON text/files (Yarara has no dict type, so values are read and written one field at a time rather than parsed into a native Yarara object).
 ```
 pytaguañemu "stdlib/core/json"
 
@@ -543,9 +634,15 @@ he'i json.getNumber(data, "version")      # get a numeric field
 he'i json.oguereko(data, "nombre")        # True if the key exists
 he'i json.papapy(data, "etiquetas")       # length of an array field
 he'i json.item(data, "etiquetas", 0)      # an array field's item by index
+he'i json.getArray(data, "etiquetas")     # the whole array field, as a real Yarara list
+
+data = json.set(data, "version", 2)       # set/replace a field (string, number, or bool)
+json.save("datos.json", data)             # write JSON text out to a file
 ```
 
-Because Yarara has no dictionary/map type and no reflection over a class instance's own fields, this library can't parse JSON into a native Yarara value the way, say, Python's ```json.load``` returns a ```dict```. Instead, every query method writes the JSON text out to a shared temporary file and shells out to a one-line ```python3 -c "..."``` invocation (Python's own ```json``` module is always available alongside the Yarara interpreter, since Yarara itself is written in Python) to answer that one specific question against it — the same "shell out for what Yarara can't do natively" pattern the OS and Path libraries use, just aimed at a Python subprocess instead of a plain OS command. A consequence of that design: every ```json.*``` call in this library takes the *raw JSON text* (via ```data```, from ```json.load```) as its first argument, not a parsed structure, since there's no parsed structure to hold; each call re-reads and re-queries that text independently. Field names passed in are also automatically escaped against breaking out of the generated Python string, so ordinary key names with a stray single quote in them won't corrupt the shelled-out command.
+Because Yarara has no dictionary/map type and no reflection over a class instance's own fields, this library can't parse JSON into a native Yarara value the way, say, Python's ```json.load``` returns a ```dict```. Instead, every query method writes the JSON text out to a shared temporary file and shells out to a one-line ```python3 -c "..."``` invocation (Python's own ```json``` module is always available alongside the Yarara interpreter, since Yarara itself is written in Python) to answer that one specific question against it — the same "shell out for what Yarara can't do natively" pattern the OS and Path libraries use, just aimed at a Python subprocess instead of a plain OS command. A consequence of that design: every ```json.*``` call in this library takes the *raw JSON text* (via ```data```, from ```json.load```) as its first argument, not a parsed structure, since there's no parsed structure to hold; each call re-reads and re-queries that text independently, and ```json.set```/```json.item```/```json.papapy``` all return **new** text rather than modifying ```data``` in place — reassign the result back to ```data``` (as in ```data = json.set(data, ...)``` above) or the change is lost. Field names passed in are also automatically escaped against breaking out of the generated Python string, so ordinary key names with a stray single quote in them won't corrupt the shelled-out command.
+
+```json.set``` writes its output pretty-printed with two-space indentation (```json.dumps(d, indent=2)``` under the hood), so a file you update with it stays human-readable rather than collapsing to one long line. ```getArray``` can't hand a whole parsed array back across the ```okerayvu()```/subprocess text boundary in one shot, so it's built by calling ```item```/```papapy``` in a loop internally, once per element — fine for the small config-style arrays this library is meant for, but worth knowing if you're ever tempted to call it on a very large array.
 
 ### Math (```stdlib/core/papapykuaa```)
 A full math library: constants (```pi```, ```tau```, ```e```), bounds (```abs```, ```sign```, ```min```, ```max```, ```clamp```), rounding (```floor```, ```ceil```, ```round```, ```trunc```, ```fract```), interpolation (```lerp```, ```smoothstep```), powers & roots (```pow```, ```sqrt```, ```cbrt```, ```hypot```), number theory (```factorial```, ```gcd```, ```lcm```, ```mod```), exponentials & logarithms (```exp```, ```ln```, ```log2```, ```log10```, ```log```), angle conversion (```degrees```, ```radians```), trigonometry (```sin```, ```cos```, ```tan```, ```asin```, ```acos```, ```atan```, ```atan2```) & hyperbolic functions (```sinh```, ```cosh```, ```tanh```).
@@ -581,6 +678,34 @@ ke(ms) {
 ```
 
 Since ```ombohasa``` gives Yarara code direct, untyped-at-the-Yarara-level access to arbitrary compiled functions, it comes with the same caveats native FFI always does in any language: passing the wrong argument types, the wrong argument count, or a mismatched return type for what the underlying C function actually expects can crash the interpreter process outright (a segfault) rather than raising a catchable Yarara error, since by that point execution has left Yarara's own safety net entirely and is running raw C. Double-check the target function's real C signature against the ```tipo_aty```/```jevy_tipo``` strings you pass before relying on a native call in anything you care about not crashing.
+
+## Command-Line Tools
+Two more substantial Yarara programs live under ```tools/```, meant to be run with ```yarara -r <name>``` once Yarara is installed (see Command-Line Flags, above) — they're also good, larger examples of the language in use, beyond the small standard library modules.
+
+### Project Scaffolding (```yaraproj```)
+```
+yarara -r yaraproj -i    # initialize a new Yarara project in the current directory
+yarara -r yaraproj -d -i # same, with debug output at every step
+yarara -r yaraproj -h    # show help
+```
+Running ```-i``` prompts for a project name, version, description and author, then creates ```.yarara/config.json``` holding those fields plus an empty ```dependencies``` array. That's genuinely all it does — earlier versions of this tool also vendored a full private copy of the interpreter, standard library, and native library into every single project's ```.yarara/```, compiling the native code fresh each time; that turned out to be redundant work (and a redundant C-compiler/network requirement) once a proper global install exists via ```yararainstall.sh```, so it was stripped back down to just the project metadata.
+
+### Package Manager (```ypm```)
+```
+yarara -r ypm -i user/repo        # install a package from a GitHub repo ("user/repo" shorthand)
+yarara -r ypm -i -l ../my-package # install a package by copying it from a local directory
+yarara -r ypm -s                  # list installed packages
+yarara -r ypm -r <name>           # remove an installed package
+yarara -r ypm -y                  # sync: install everything listed in config.json's dependencies
+```
+Installed packages live at ```.yarara/packages/<name>/```, and every one of them **must** contain a ```main.ya``` entry point — that's what makes a directory count as a valid package here. If a fetched package doesn't have one, the install is rejected and the incomplete directory is cleaned up automatically, rather than leaving a broken half-installed package around. A successful install also writes ```.yarara/packages/<name>/package.json``` (its own name/type/source), separate from the project's own ```config.json```.
+
+The ```-y``` (sync) command is the one worth understanding a little deeper: ```.yarara/packages/``` is a local build artifact — not something you'd commit to git, the same way ```node_modules/``` isn't in a typical JavaScript project — so after cloning a project fresh, that directory simply doesn't exist yet. For sync to be able to reinstall everything from nothing but a freshly-cloned ```config.json```, the *install source* has to be recoverable from ```config.json``` itself, not just from files sitting inside the (absent) packages directory. That's why each entry in ```config.json```'s ```dependencies``` array is stored encoded as ```"name=type:source"``` (e.g. ```"algo=repo:someuser/algo"``` or ```"mypkg=local:/home/me/mypkg"```) rather than just a bare package name — it's a small, deliberate design choice to make the project actually reproducible from source control alone.
+
+Import an installed package by its short name, the same way any other module is imported (see Imports, above):
+```
+pytaguañemu "user_repo_name"
+```
 
 ## Examples
 There is an examples folder in the [GitHub Repository](https://github.com/RandomGuy4114/Yarara). meant to be used as templates or for learning, you're welcome! It currently includes:

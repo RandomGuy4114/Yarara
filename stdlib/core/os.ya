@@ -65,6 +65,57 @@ mbo'ehakoty osy {
         }
         mbojevy okerayvu("echo $SHELL")
     }
+
+    # List of command-line arguments passed after the script's own path,
+    # e.g. `yarara main.ya --foo bar` gives ["--foo", "bar"] here.
+    argv() {
+        mbojevy argv()
+    }
+
+    # Which shell startup file 'alias' definitions should be persisted to
+    rcArchivo() {
+        shell = che.rekoShell()
+        ramo oguereko(shell, "zsh") {
+            mbojevy "~/.zshrc"
+        }
+        ramo oguereko(shell, "bash") {
+            mbojevy "~/.bashrc"
+        }
+        mbojevy "~/.profile"
+    }
+
+    setAlias(alias, command) {
+        ramo che.platform == "Windows" {
+            macro_archivo = "%USERPROFILE%\\yarara_doskey_macros.cmd"
+            okerayvu("echo " + alias + "=" + command + " >> " + macro_archivo)
+            okerayvu(
+                "reg add \"HKCU\\Software\\Microsoft\\Command Processor\" /v AutoRun /d \"doskey /macrofile=" +
+                macro_archivo + "\" /f"
+            )
+        } ambue {
+            rc_archivo = che.rcArchivo()
+            # A quoted heredoc ('YARARA_EOF') is appended instead of a
+            # single echo line, so the shell doesn't try to expand
+            # anything ($, `, \) inside 'command', and the rc file gets a
+            # readable blank-line + comment + alias block.
+            okerayvu(
+                "cat >> " + rc_archivo + " <<'YARARA_EOF'\n" +
+                "\n" +
+                "# Added by Yarara\n" +
+                "alias " + alias + "='" + command + "'\n" +
+                "YARARA_EOF"
+            )
+        }
+    }
+
+    sourceShell() {
+        ramo che.platform == "Windows" {
+            mbojevy okerayvu("doskey /macrofile=%USERPROFILE%\\yarara_doskey_macros.cmd")
+        } ambue {
+            rc_archivo = che.rcArchivo()
+            mbojevy okerayvu("source " + rc_archivo)
+        }
+    }
 }
 
 os = pyahu osy()

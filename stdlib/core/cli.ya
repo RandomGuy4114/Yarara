@@ -1,0 +1,44 @@
+# -------------------------------------------------------
+# Yarara CLI Library
+# This Library makes it easier to create command-line
+# interfaces (CLI) in Yarara.
+# By: FormalBlaze
+# -------------------------------------------------------
+
+pytaguañemu "stdlib/core/os"
+pytaguañemu "stdlib/core/papapykuaa"
+
+mbo'ehakoty cliy {
+    ñepyrũ() {
+        che.platform = os.plataforma()
+    }
+
+    progressBar(current, total, barLength, fillChar, emptyChar) {
+        ramo total == 0 {
+            mbojevy ""
+        }
+        progress = current / total
+        filledLen = papapykuaa.floor(barLength * progress)
+        i = 0
+        bar = ""
+        aja i < filledLen {
+            bar = bar + fillChar
+            i = i + 1
+        }
+        aja i < barLength {
+            bar = bar + emptyChar
+            i = i + 1
+        }
+        mbojevy bar
+    }
+
+    clearLastLine() {
+        ramo che.platform == "Windows" {
+            python "import sys; sys.stdout.write('\\r'); sys.stdout.flush()"
+        } ambue {
+            python "import sys; sys.stdout.write('\\033[1A\\033[2K'); sys.stdout.flush()"
+        }
+    }
+}
+
+cli = pyahu cliy()

@@ -90,6 +90,54 @@ mbo'ehakoty jsony {
             che.tmp_path + "')); print('" + k + "' in d)\""
         ) == "True"
     }
+
+    # Turns a Yarara scalar value into a Python literal so it can be
+    # embedded in the -c code we shell out to. Only strings, numbers &
+    # booleans are supported (no lists/objects).
+    ñemoypyʼi(mba'e) {
+        ramo ñe'ẽmi(mba'e) {
+            # Single-quoted, like the rest of this file's embedded python
+            # strings (d['key'], open('path')) — the whole -c argument is
+            # wrapped in literal double-quotes for the shell, so a raw "
+            # here would end that region early.
+            mbojevy "'" + che.ñemboheʼa(mba'e) + "'"
+        }
+        # str() of a number or bool (5, 3.14, True, False) is already a
+        # valid Python literal
+        mbojevy hu'ãva(mba'e)
+    }
+
+    # Sets a field on the JSON object and returns the updated JSON text.
+    # Usage: data = json.set(data, "version", 3)
+    set(json_ñe'ẽ, ñe'ẽjoaju, mba'e) {
+        che.ñongatu(json_ñe'ẽ)
+        k = che.ñemboheʼa(ñe'ẽjoaju)
+        v = che.ñemoypyʼi(mba'e)
+        mbojevy okerayvu(
+            "python3 -c \"import json; d=json.load(open('" +
+            che.tmp_path + "')); d['" + k + "']=" + v +
+            "; print(json.dumps(d, indent=2))\""
+        )
+    }
+
+    # Writes JSON text out to a file
+    save(archivo_rape, json_ñe'ẽ) {
+        path.writeFile(archivo_rape, json_ñe'ẽ)
+    }
+
+    # Reads an array field back out as a real Yarara list (item-by-item,
+    # since there's no way to hand a whole parsed array back across the
+    # okerayvu() string boundary in one shot)
+    getArray(json_ñe'ẽ, ñe'ẽjoaju) {
+        n = che.papapy(json_ñe'ẽ, ñe'ẽjoaju)
+        resultado = []
+        i = 0
+        aja i < n {
+            jehupi(resultado, che.item(json_ñe'ẽ, ñe'ẽjoaju, i))
+            i = i + 1
+        }
+        mbojevy resultado
+    }
 }
 
 json = pyahu jsony()

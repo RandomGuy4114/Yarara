@@ -1,0 +1,358 @@
+# ----------------------------
+# YARARA PACKAGE MANAGER (YPM)
+# By FormalBlaze
+# ----------------------------
+
+# Imports
+pytaguañemu "stdlib/core/sa'y"
+pytaguañemu "stdlib/core/os"
+pytaguañemu "stdlib/core/papapykuaa"
+pytaguañemu "stdlib/core/cli"
+pytaguañemu "stdlib/core/path"
+pytaguañemu "stdlib/core/network"
+pytaguañemu "stdlib/core/json"
+
+configPath = ".yarara/config.json"
+packagesDir = ".yarara/packages"
+
+# --- String helpers ---
+# (Yarara has no string slicing or split-with-limit, so these are built
+# from indexing + ojuhu instead)
+
+# Returns the text after the last occurrence of sep, or the whole text if
+# sep isn't found — e.g. the repo/folder name at the end of a path
+japo lastSegment(text, sep) {
+    lastIdx = -1
+    i = 0
+    n = papapy(text)
+    aja i < n {
+        ramo text[i] == sep {
+            lastIdx = i
+        }
+        i = i + 1
+    }
+    ramo lastIdx == -1 {
+        mbojevy text
+    }
+    result = ""
+    j = lastIdx + 1
+    aja j < n {
+        result = result + text[j]
+        j = j + 1
+    }
+    mbojevy result
+}
+
+# Splits text into [before, after] on the FIRST occurrence of sep only
+# (unlike split(), which would break on a source string that happens to
+# contain sep more than once). Returns [text] if sep isn't found.
+japo splitOnce(text, sep) {
+    idx = ojuhu(text, sep)
+    ramo idx == -1 {
+        mbojevy [text]
+    }
+    before = ""
+    i = 0
+    aja i < idx {
+        before = before + text[i]
+        i = i + 1
+    }
+    after = ""
+    j = idx + papapy(sep)
+    n = papapy(text)
+    aja j < n {
+        after = after + text[j]
+        j = j + 1
+    }
+    mbojevy [before, after]
+}
+
+# Returns a copy of lst with every occurrence of value removed
+japo removeFromList(lst, value) {
+    result = []
+    i = 0
+    n = papapy(lst)
+    aja i < n {
+        ramo lst[i] != value {
+            jehupi(result, lst[i])
+        }
+        i = i + 1
+    }
+    mbojevy result
+}
+
+# --- Dependency tracking ---
+#
+# .yarara/config.json's "dependencies" array holds one encoded string per
+# package: "name=type:source", e.g. "algo=repo:someuser/algo" or
+# "mypkg=local:/home/me/mypkg". Storing the source (not just the name)
+# here — rather than only inside .yarara/packages/, which typically isn't
+# committed to git — is what lets 'sync' actually reinstall everything
+# after a fresh clone, when packages/ doesn't exist yet at all.
+#
+# Best-effort: a project without a config.json (never set up with
+# yaraproj -i) just skips dependency tracking silently — it's a nice-to-have
+# on top of install/remove/list/sync, not a requirement for install/remove
+# themselves to work.
+
+japo encodeDependency(name, type, source) {
+    mbojevy name + "=" + type + ":" + source
+}
+
+# Returns [name, type, source]
+japo decodeDependency(entry) {
+    parts = splitOnce(entry, "=")
+    name = parts[0]
+    rest = parts[1]
+    parts2 = splitOnce(rest, ":")
+    mbojevy [name, parts2[0], parts2[1]]
+}
+
+japo findDependencyIndex(deps, name) {
+    i = 0
+    n = papapy(deps)
+    aja i < n {
+        info = decodeDependency(deps[i])
+        ramo info[0] == name {
+            mbojevy i
+        }
+        i = i + 1
+    }
+    mbojevy -1
+}
+
+japo addDependency(name, type, source) {
+    ramo path.esArchivo(configPath) {
+        data = json.load(configPath)
+        deps = json.getArray(data, "dependencies")
+        existing = findDependencyIndex(deps, name)
+        ramo existing != -1 {
+            deps = removeFromList(deps, deps[existing])
+        }
+        jehupi(deps, encodeDependency(name, type, source))
+        data = json.set(data, "dependencies", deps)
+        json.save(configPath, data)
+    }
+}
+
+japo removeDependency(name) {
+    ramo path.esArchivo(configPath) {
+        data = json.load(configPath)
+        deps = json.getArray(data, "dependencies")
+        existing = findDependencyIndex(deps, name)
+        ramo existing != -1 {
+            deps = removeFromList(deps, deps[existing])
+            data = json.set(data, "dependencies", deps)
+            json.save(configPath, data)
+        }
+    }
+}
+
+# --- Package installation ---
+#
+# Every installed package lives at .yarara/packages/<name>/ and MUST
+# contain a main.ya entry point — that's what makes a directory a valid
+# Yarara package here, so it's checked right after fetching and the
+# install is rolled back if it's missing. Each package also gets its own
+# package.json with basic info (name/type/source), separate from the
+# project's own config.json.
+
+# Writes .yarara/packages/<name>/package.json
+japo writePackageInfo(name, type, source) {
+    info = "{}"
+    info = json.set(info, "name", name)
+    info = json.set(info, "type", type)
+    info = json.set(info, "source", source)
+    json.save(packagesDir + "/" + name + "/package.json", info)
+}
+
+# Checks for main.ya, rolls back (deletes) the install if it's missing.
+# Returns True if the package is valid.
+japo verifyPackage(name) {
+    destino = packagesDir + "/" + name
+    ramo path.esArchivo(destino + "/main.ya") {
+        mbojevy 1
+    }
+    he'i col(
+        "Error: " + name + " has no main.ya entry point — every package " +
+        "must have one. Removing incomplete install.",
+        "red"
+    )
+    path.rmdir(destino)
+    mbojevy 0
+}
+
+# Installs a package from a GitHub repo, given as "user/repo"
+japo installFromRepo(repo) {
+    packageName = lastSegment(repo, "/")
+    url = "https://github.com/" + repo + ".git"
+    destino = packagesDir + "/" + packageName
+    path.mkdir(packagesDir)
+    network.clone(url, destino)
+    ramo verifyPackage(packageName) {
+        writePackageInfo(packageName, "repo", repo)
+        addDependency(packageName, "repo", repo)
+        he'i col("Installed " + packageName + " to " + destino, "green")
+    }
+}
+
+# Installs a package by copying it from a local directory
+japo installFromLocal(localPath) {
+    # Strip a trailing slash (e.g. from shell tab-completion), otherwise
+    # lastSegment() would return an empty package name. (myengovia() can't
+    # be used here — it replaces every "/" in the path, not just the
+    # trailing one.)
+    ramo localPath[papapy(localPath) - 1] == "/" {
+        trimmed = ""
+        k = 0
+        m = papapy(localPath) - 1
+        aja k < m {
+            trimmed = trimmed + localPath[k]
+            k = k + 1
+        }
+        localPath = trimmed
+    }
+    packageName = lastSegment(localPath, "/")
+    destino = packagesDir + "/" + packageName
+    path.mkdir(packagesDir)
+    ramo os.plataforma() == "Windows" {
+        okerayvu("xcopy /e /i /y \"" + localPath + "\" \"" + destino + "\"")
+    } ambue {
+        okerayvu("cp -r " + localPath + " " + destino)
+    }
+    ramo verifyPackage(packageName) {
+        writePackageInfo(packageName, "local", localPath)
+        addDependency(packageName, "local", localPath)
+        he'i col("Installed " + packageName + " to " + destino, "green")
+    }
+}
+
+# Removes an installed package by name
+japo removePackage(name) {
+    target = packagesDir + "/" + name
+    ramo nahániri path.esDir(target) {
+        he'i col("Error: package '" + name + "' is not installed.", "red")
+        mbojevy 0
+    }
+    path.rmdir(target)
+    removeDependency(name)
+    he'i col("Removed " + name, "green")
+}
+
+# Lists installed packages
+japo listPackages() {
+    ramo nahániri path.esDir(packagesDir) {
+        he'i "No packages installed."
+        mbojevy 0
+    }
+    packages = path.listDir(packagesDir)
+    ramo papapy(packages) == 0 {
+        he'i "No packages installed."
+        mbojevy 0
+    }
+    he'i col("Installed packages:", "blue")
+    i = 0
+    n = papapy(packages)
+    aja i < n {
+        he'i "  " + packages[i]
+        i = i + 1
+    }
+}
+
+# Installs every dependency listed in config.json (skipping ones already
+# present under .yarara/packages/) — the 'npm install with no args' flow
+japo syncDependencies() {
+    ramo nahániri path.esArchivo(configPath) {
+        he'i col("Error: no .yarara/config.json found — nothing to sync.", "red")
+        mbojevy 0
+    }
+    data = json.load(configPath)
+    deps = json.getArray(data, "dependencies")
+    n = papapy(deps)
+    ramo n == 0 {
+        he'i "No dependencies to install."
+        mbojevy 0
+    }
+    he'i col("Syncing " + hu'ãva(n) + " dependencies...", "blue")
+    i = 0
+    aja i < n {
+        info = decodeDependency(deps[i])
+        name = info[0]
+        type = info[1]
+        source = info[2]
+        ramo path.esDir(packagesDir + "/" + name) {
+            he'i "  " + name + " already installed, skipping."
+        } ambue {
+            ramo type == "local" {
+                installFromLocal(source)
+            } ambue {
+                installFromRepo(source)
+            }
+        }
+        i = i + 1
+    }
+    he'i col("Sync complete.", "green")
+}
+
+# --- Flags ---
+
+args = argv()
+i = ojuhu(args, "-i")
+l = ojuhu(args, "-l")
+r = ojuhu(args, "-r")
+s = ojuhu(args, "-s")
+y = ojuhu(args, "-y")
+
+install = ""
+repoPath = ""
+localInstall = ""
+removeName = ""
+
+ramo i != -1 {
+    install = "-i"
+    ramo i + 1 < papapy(args) {
+        repoPath = args[i + 1]
+    } ambue {
+        he'i col("Error: -i requires a repository argument.", "red")
+    }
+}
+
+ramo l != -1 {
+    localInstall = "-l"
+    ramo l + 1 < papapy(args) {
+        repoPath = args[l + 1]
+    } ambue {
+        he'i col("Error: -l requires a local path argument.", "red")
+    }
+}
+
+ramo r != -1 {
+    ramo r + 1 < papapy(args) {
+        removeName = args[r + 1]
+    } ambue {
+        he'i col("Error: -r requires a package name argument.", "red")
+    }
+}
+
+# --- Dispatch ---
+
+ramo install == "-i" {
+    ramo localInstall == "-l" {
+        installFromLocal(repoPath)
+    } ambue {
+        installFromRepo(repoPath)
+    }
+} ambue ramo removeName != "" {
+    removePackage(removeName)
+} ambue ramo s != -1 {
+    listPackages()
+} ambue ramo y != -1 {
+    syncDependencies()
+} ambue {
+    he'i col("Yarara Package Manager (ypm)", "green")
+    he'i "  -i <user/repo>       Install a package from GitHub"
+    he'i "  -i -l <path>          Install a package from a local path"
+    he'i "  -r <name>             Remove an installed package"
+    he'i "  -s                    List installed packages"
+    he'i "  -y                    Install (sync) all dependencies from config.json"
+}

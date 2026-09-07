@@ -76,6 +76,35 @@ mbo'ehakoty pathy {
         result = okerayvu("test -f " + path + " && echo 'true' || echo 'false'")
         mbojevy result == "true"
     }
+    
+    moveFile(source, destination) {
+        ramo che.platform == "Windows" {
+            okerayvu("move " + source + " " + destination)
+        } ambue {
+            okerayvu("mv " + source + " " + destination)
+        }
+    }
+
+    # Returns the absolute path of 'path', whether it's a file or a
+    # directory. ('cd path && pwd' only ever worked for directories —
+    # cd-ing into a file just fails silently, since okerayvu() discards
+    # stderr, so this used python's os.path.abspath instead.)
+    getPath(path) {
+        mbojevy okerayvu("python3 -c \"import os,sys; print(os.path.abspath(sys.argv[1]))\" " + path)
+    }
+
+    # Lists the entries directly inside a directory (not recursive)
+    listDir(path) {
+        ramo che.platform == "Windows" {
+            result = okerayvu("dir /b \"" + path + "\"")
+        } ambue {
+            result = okerayvu("ls -1 " + path)
+        }
+        ramo result == "" {
+            mbojevy []
+        }
+        mbojevy split(result, "\n")
+    }
 }
 
 path = pyahu pathy()

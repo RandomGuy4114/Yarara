@@ -1,0 +1,50 @@
+# -------------------------------------------------------
+# Yarara NETWORK Library
+# This Library makes it easier to perform network-related
+# operations in Yarara, such as sending HTTP requests and
+# handling responses. Cool, right?
+# By: FormalBlaze
+# -------------------------------------------------------
+
+pytaguañemu "stdlib/core/os"
+
+mbo'ehakoty networky {
+    ñepyrũ() {
+        che.platform = os.plataforma()
+    }
+    
+    clone(repository_url, destination_path) {
+        ramo che.platform == "Windows" {
+            okerayvu("git clone " + repository_url + " " + destination_path)
+        } ambue {
+            okerayvu("git clone " + repository_url + " " + destination_path)
+        }
+    }
+    getFile(url) {
+        okerayvu("curl -O " + url)
+    }
+
+    # Clones just one subfolder of a git repo (via a shallow sparse
+    # checkout, so the whole repo's history/other files aren't pulled
+    # down) into destination_path.
+    # NOTE: requires git >= 2.25 for 'sparse-checkout --cone'.
+    cloneFolder(repository_url, folder_ape, destination_path) {
+        tmp_archivo = ".yarara_clone_tmp"
+        okerayvu("git clone --no-checkout --depth 1 " + repository_url + " " + tmp_archivo)
+        okerayvu(
+            "cd " + tmp_archivo +
+            " && git sparse-checkout init --cone" +
+            " && git sparse-checkout set " + folder_ape +
+            " && git checkout"
+        )
+        ramo che.platform == "Windows" {
+            okerayvu("move \"" + tmp_archivo + "\\" + folder_ape + "\" \"" + destination_path + "\"")
+            okerayvu("rmdir /s /q " + tmp_archivo)
+        } ambue {
+            okerayvu("mv " + tmp_archivo + "/" + folder_ape + " " + destination_path)
+            okerayvu("rm -rf " + tmp_archivo)
+        }
+    }
+}
+
+network = pyahu networky()
