@@ -548,3 +548,15 @@ a:hover {
   padding-bottom: 10px;
   border-bottom: 1px solid var(--border-soft);
 }
+
+.App-cta-code {
+  width: 100%;
+  max-width: 800px;
+  background-color: white;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  margin-top: 20px;
+}

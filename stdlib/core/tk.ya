@@ -1,0 +1,68 @@
+# -------------------------------------------------------
+# Yarara TK Library
+# This Library makes it easier to create GUI applications
+# in Yarara using the Tkinter framework.
+# By: FormalBlaze ( & Claude )
+# -------------------------------------------------------
+
+mbo'ehakoty tk {
+    ñepyrũ(titulo, ancho, alto) {
+        che.titulo = titulo
+        che.ancho = ancho
+        che.alto = alto
+        che.widgets = ""
+        che.contador = 0
+    }
+
+    # Returns a fresh unique widget name, e.g. ".w0", ".w1", ...
+    novoNombre() {
+        nombre = ".w" + hu'ãva(che.contador)
+        che.contador = che.contador + 1
+        mbojevy nombre
+    }
+
+    # Adds a text label
+    addLabel(texto) {
+        nombre = che.novoNombre()
+        che.widgets = che.widgets + "label " + nombre + " -text \"" + texto + "\"\n"
+        che.widgets = che.widgets + "pack " + nombre + " -pady 5\n"
+        mbojevy nombre
+    }
+
+    # Adds a clickable button. comandoTcl is raw Tcl run when it's clicked
+    # (e.g. "puts hola") — there's no way for a click to call back into
+    # Yarara code itself, since Tk runs the click handler on its own,
+    # already-running native event loop, not through the Yarara
+    # interpreter.
+    addButton(texto, comandoTcl) {
+        nombre = che.novoNombre()
+        che.widgets = che.widgets + "button " + nombre + " -text \"" + texto + "\" -command {" + comandoTcl + "}\n"
+        che.widgets = che.widgets + "pack " + nombre + " -pady 5\n"
+        mbojevy nombre
+    }
+
+    # Adds a single-line text entry box
+    addEntry() {
+        nombre = che.novoNombre()
+        che.widgets = che.widgets + "entry " + nombre + "\n"
+        che.widgets = che.widgets + "pack " + nombre + " -pady 5\n"
+        mbojevy nombre
+    }
+
+    # Escape hatch: append any raw Tcl/Tk for widgets not covered above
+    addTcl(script) {
+        che.widgets = che.widgets + script + "\n"
+    }
+
+    # Opens the window with every widget added so far, and blocks until
+    # the window is closed (this runs Tk's own native event loop).
+    openWindow() {
+        mbojevy ombohasa(
+            "native/build/tk.so",
+            "run_tk_app",
+            ["str", "int", "int", "str"],
+            "int",
+            [che.titulo, che.ancho, che.alto, che.widgets]
+        )
+    }
+}

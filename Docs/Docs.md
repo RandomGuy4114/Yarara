@@ -10,7 +10,7 @@ All syntax in Guarani will be translated to english for easier understanding.
 ## Getting Started
 
 ### Installation
-Installing Yarara is very easy, there is currently no "installer" for the language, but it is installable by cloning our [GitHub Repository](https://github.com/RandomGuy4114/Yarara).
+Installing Yarara is very easy, you just have to run this command in the terminal: ```bash <(curl -sSL https://raw.githubusercontent.com/RandomGuy4114/Yarara/refs/heads/main/tools/yararainstall.sh)```
 
 
 ### Running

@@ -45,6 +45,7 @@ mbo'ehakoty networky {
             okerayvu("rm -rf " + tmp_archivo)
         }
     }
+
 }
 
 network = pyahu networky()

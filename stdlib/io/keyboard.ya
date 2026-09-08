@@ -1,0 +1,10 @@
+# -------------------------------------------------------
+# Yarara KEYBOARD Library
+# This Library makes it easier to perform keyboard-related
+# operations in Yarara, such as reading user input and
+# handling key events.
+# By: FormalBlaze
+# -------------------------------------------------------
+
+pytaguañemu "stdlib/core/os"
+

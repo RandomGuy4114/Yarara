@@ -404,20 +404,17 @@ he'i FetchLine3`);
           Start your journey with Yarara today and experience the power of
           programming in Guarani.
         </motion.p>
-        <motion.div
-          className="App-buttons"
+        <motion.code
           initial={{ opacity: 0, y: -20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5, ease: "easeOut", delay: 0.6 }}
+          className="App-cta-code"
         >
-          <button onClick={() => nav("/docs/getting-started")}>
-            Get Started
-          </button>
-          <button className="border-btn" onClick={() => nav("/docs")}>
-            Documentation
-          </button>
-        </motion.div>
+          bash &lt;(curl -sSL https://raw.githubusercontent.com/RandomGuy4114/Yarara/refs/heads/main/tools/yararainstall.sh)
+        </motion.code>
+        <p style={{ textAlign: "center", fontStyle: "italic" }}>This script will install Yarara on your system.</p>
+        
       </div>
       <Footer />
     </div>
